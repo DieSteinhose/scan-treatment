@@ -21,7 +21,7 @@ wait_file() {
 }
 
 echo "Maintainer: Ollie Spila"
-echo "Version: 3.0.0 - 14.04.2022 - MULTI"
+echo "Version: 3.1.0 - 21.03.2024 - MULTI"
 
 # Changelog
 
@@ -70,7 +70,7 @@ inotifywait -m -e close_write --format "%f" $TARGET \
                                         # Optimiert die eingehende PDF und speichert die in export Ordner
 
                                         # Schwarzweiss
-                                        magick -density 300 "${TARGET}$MERGE_NAME" -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW "$PROCESSED$DATE$FILENAME" \
+                                        magick -density 300 "${TARGET}$MERGE_NAME" -chop 5x5 -deskew 60% +repage -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW "$PROCESSED$DATE$FILENAME" \
                                         && echo MULTI: "${green}PDF verarbeitung in SW erfolgreich abgeschlossen${reset}"
 
                                 else

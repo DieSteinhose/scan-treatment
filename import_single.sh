@@ -10,7 +10,7 @@ green=`tput setaf 2`
 reset=`tput sgr0`
 
 echo "Maintainer: Ollie Spila"
-echo "Version: 3.0.0 - 14.04.2022 - SINGLE"
+echo "Version: 3.1.0 - 21.03.2024 - SINGLE"
 
 
 
@@ -40,7 +40,7 @@ inotifywait -m -e close_write --format "%f" $TARGET \
                                 # Optimiert die eingehende PDF und speichert die in export Ordner
 
                                 # Schwarzweiss
-                                magick -density 300 "$TARGET$FILENAME" -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW "$PROCESSED$DATE$FILENAME" \
+                                magick -density 300 "$TARGET$FILENAME" -chop 5x5 -deskew 60% +repage -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW "$PROCESSED$DATE$FILENAME" \
                                 && echo SINGLE: "${green}PDF verarbeitung in SW erfolgreich abgeschlossen${reset}"
 
                         else
