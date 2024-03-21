@@ -1,0 +1,17 @@
+*.md
+Dockerfile
+.gitignore
+main.yml
+.git
+.cache
+*.pdf
+*.env
+
+export
+export/*
+import
+import/*
+import_testing
+import_testing/*
+test_zum_vergleich
+test_zum_vergleich/*
