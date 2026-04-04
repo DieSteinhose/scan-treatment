@@ -57,11 +57,11 @@ upload_to_paperless() {
 
     log "Uploading '$(basename "$file")' to Paperless..."
     local http_code
-    http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
         -X POST \
         -H "Authorization: Token $PAPERLESS_TOKEN" \
         -F "document=@${file}" \
-        "${PAPERLESS_URL%/}/api/documents/post_document/") || http_code="000"
+        "${PAPERLESS_URL%/}/api/documents/post_document/")
 
     if [[ "$http_code" =~ ^2 ]]; then
         log_ok "Paperless upload successful (HTTP $http_code)"
