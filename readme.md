@@ -112,6 +112,14 @@ services:
 
 ## Build
 
+Pre-built images are available from the GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/DieSteinhose/scan-treatment:latest
+```
+
+Or build locally:
+
 ```bash
 docker build -t scan-treatment .
 ```
