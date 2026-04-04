@@ -280,6 +280,16 @@ main() {
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
     rm -f "$LOCK_FILE" "$TRIGGER_FILE"
 
+    # Re-upload any leftover files in export dir from a previous run
+    local leftover
+    leftover=$(find "$EXPORT_DIR" -maxdepth 1 -name "*.pdf" 2>/dev/null)
+    if [[ -n "$leftover" ]]; then
+        log_warn "Found leftover files in $EXPORT_DIR – retrying upload..."
+        while IFS= read -r file; do
+            upload_to_paperless_with_retry "$file"
+        done <<< "$leftover"
+    fi
+
     start_http_server
 
     while IFS= read -r FILENAME; do
