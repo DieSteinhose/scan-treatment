@@ -1,64 +1,116 @@
-## SMB Freigaben
+# scan-treatment
 
-nach /data/
+Docker container for automatic scanner PDF processing. Optimizes black & white and color scans and uploads them directly to [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) via API. Multi-page document assembly is triggered via a Home Assistant button.
 
-docker run --rm -it  printers2paperless:latest -v "$(pwd)"/target:/app
+## How it works
 
+The container watches an input directory using `inotifywait`. When the scanner drops a file, it is processed immediately (single mode) or collected with other pages and processed after a trigger (multi mode).
 
-Idee:
-1) try adding -compress JPG -quality 80 ( or whatever quality you want for the jpg). I do not know if this will work.
-bzw: try -compress JPEG
+**Black & white** (`scan-sw*.pdf`): ImageMagick – deskew, normalize, posterize, LZW compression  
+**Color** (everything else): Ghostscript – bicubic downsampling to 300 DPI, `/ebook` preset
 
+### Single mode (`DISABLE_MULTI=true`)
 
-Evenutell /etc/ImageMagick-6/delegates.xml anpassen damit imagemagick/convert gs umwandlungen direkt vornimmt, spart ein schritt
+Every incoming PDF is processed immediately on arrival. Best suited for printers that natively produce multi-page PDFs. Both ImageMagick and Ghostscript handle multi-page PDFs correctly without any additional merging step.
 
+### Multi mode (default)
 
-## Interesannte Commands
+The first incoming scan starts a collection phase. Additional pages can keep arriving. Once the Home Assistant button fires the trigger (or `BUTTON_PAUSE` seconds elapse), all collected PDFs are merged, processed, and uploaded to Paperless.
 
- pdfimages -list scan-sw.pdf
+```
+Scan page 1 → scan page 2 → ... → HA button → process + upload to Paperless
+```
 
+## Quick start
 
-# Fehler beim umwandeln von Scan zu convert pdf
-https://github.com/ImageMagick/ImageMagick/issues/2070
+```bash
+docker run -d \
+  -v /path/to/scans:/data/import \
+  -p 8080:8080 \
+  -e PAPERLESS_URL=http://paperless:8000 \
+  -e PAPERLESS_TOKEN=your-api-token \
+  scan-treatment:latest
+```
 
+## Configuration
 
-magick -density 600 -quality 20 -compress jpeg ROHDATEI.pdf -strip -interlace Plane -sampling-factor 4:2:0 -normalize -gamma 0.8,0.8,0.8 +dither -posterize 3 BEARBEITET.pdf
+All settings are controlled via environment variables.
 
--quality 60 -compress jpeg
+| Variable | Default | Description |
+|---|---|---|
+| `WATCH_DIR` | `/data/import/` | Directory watched for incoming scans |
+| `EXPORT_DIR` | `/data/export/` | Output directory when Paperless is not configured |
+| `SW_PATTERN` | `scan-sw` | Filename prefix identifying B&W scans |
+| `DISABLE_MULTI` | `false` | `true` = process each file immediately, no merging |
+| `PAPERLESS_URL` | – | Base URL of your Paperless-ngx instance |
+| `PAPERLESS_TOKEN` | – | API token (Paperless → Settings → API Token) |
+| `HTTP_PORT` | `8080` | Port for the HTTP trigger endpoint |
+| `BUTTON_PAUSE` | `1800` | Seconds to wait for trigger before auto-proceeding |
+| `FAIL_PAUSE` | `60` | Seconds between Paperless upload retries |
+| `TG_API_KEY` | – | Telegram bot token (optional) |
+| `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 
-## Optimiert
-magick -density 300 IMPORT.pdf -strip -interlace Plane -normalize -gamma 0.8,0.8,0.8 +dither -posterize 3 -compress LZW EXPORT.pdf
+## Home Assistant integration
 
-### Optimiet für SW
-magick -density 300 scan-sw.pdf -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW export.pdf
+The container exposes a lightweight HTTP server. A `GET` or `POST` to `/trigger` fires the multi-mode processing.
 
-Für Farbe Suboptimal
+**`configuration.yaml`**
+```yaml
+rest_command:
+  scan_trigger:
+    url: http://192.168.1.x:8080/trigger
+    method: POST
+```
 
-## Ideen für Farbig
-gswin64c.exe -sOutputFile=out.pdf -dNOPAUSE -dBATCH ^-sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -c "<< /ColorACSImageDict << /VSamples [ 1 1 1 1 ] /HSamples [ 1 1 1 1 ] /QFactor 0.08 /Blend 1 >> /ColorImageDownsampleType /Bicubic /ColorConversionStrategy /LeaveColorUnchanged >> setdistillerparams" -f in1.pdf
+**Automation / button action**
+```yaml
+action: rest_command.scan_trigger
+```
 
-### Origig
-ghostscript -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -sOutputFile="$PROCESSED$DATE$FILENAME" "$TARGET$FILENAME"
+Available endpoints:
 
-# Optimiert (vorerst) für Farbig (gleiche wie Orig)
+| Path | Description |
+|---|---|
+| `/trigger` | Fire processing (GET or POST) |
+| `/health` | Health check, returns `200 OK` |
 
-ghostscript -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -sOutputFile="$PROCESSED$DATE$FILENAME" "$TARGET$FILENAME" \
+## Filename convention
 
+The scan filename determines which processing pipeline is used:
 
-## Testing Farbig (TODO)
-Hat ganz gute ergebnisse, posterize könnte man noch anpassen
+| Filename starts with | Pipeline |
+|---|---|
+| `scan-sw` (configurable via `SW_PATTERN`) | ImageMagick B&W optimization |
+| anything else | Ghostscript color optimization |
 
-magick -density 300 scan-farbe.pdf -strip -interlace Plane -gamma 0.7,0.7,0.7 -posterize 8 -compress JPEG -quality 20% fine-tuning-EXPORT-mit_dithering-mit_inter_plane-post_8-gamma_0.7-ohne_normalize_in_jpg-20.pdf
+## docker-compose example
 
+```yaml
+services:
+  scan-treatment:
+    image: scan-treatment:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /mnt/scanner/import:/data/import
+    environment:
+      PAPERLESS_URL: http://paperless-ngx:8000
+      PAPERLESS_TOKEN: your-api-token
+      BUTTON_PAUSE: "600"
+      TG_API_KEY: "123456:ABC..."   # optional
+      TG_CHAT_ID: "123456789"       # optional
+```
 
-magick source.jpg -strip -interlace Plane -sampling-factor 4:2:0 -quality 20% result.jpg
+## Build
 
+```bash
+docker build -t scan-treatment .
+```
 
-## Image mit ImageMagick7
-dpokidov/imagemagick:latest-ubuntu
+## Notes
 
-
-## TODO
-- Wenn Container startet und in export noch dateien sind, diese bei Start hochladen (Done)
-- Amazon Dash button support in Container hinzufügen (Done)
-- Sobald die Verarbeitung anfängt, die Datein in einen neuen Verzeichnis schieben, um direkt den nächsten Scan zu ermöglichen
+- Without `PAPERLESS_URL` and `PAPERLESS_TOKEN`, processed files are kept in `EXPORT_DIR` and not uploaded.
+- Failed Paperless uploads are retried indefinitely every `FAIL_PAUSE` seconds.
+- Telegram notifications are fully optional. Nothing is sent if `TG_API_KEY` is unset.
+- In multi mode, only one batch runs at a time. Files arriving during an active batch are automatically added to the current stack.

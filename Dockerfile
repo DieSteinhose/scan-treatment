@@ -1,23 +1,34 @@
 FROM dpokidov/imagemagick:latest-ubuntu
 
-# Veraltete ImageMagick in ubuntu 20.04 version
-# FROM ubuntu:20.04
+# Nicht über apt installieren: ghostscript (kommt aus dem Base-Image)
 
 ENV FAIL_PAUSE=60 \
-    BUTTON_PAUSE=1800
+    BUTTON_PAUSE=1800 \
+    HTTP_PORT=8080 \
+    WATCH_DIR=/data/import/ \
+    EXPORT_DIR=/data/export/ \
+    DISABLE_MULTI=false \
+    SW_PATTERN=scan-sw \
+    PAPERLESS_URL= \
+    PAPERLESS_TOKEN=
 
-RUN apt update && apt install -y poppler-utils inotify-tools ftp-upload curl libncurses6 htop nano python3 python3-pip tcpdump
+RUN apt-get update && apt-get install -y \
+    poppler-utils \
+    inotify-tools \
+    curl \
+    socat \
+    libncurses6 \
+    htop \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install amazon-dash && python3 -m amazon_dash.install
-
-# Nicht über apt installieren: ghostscript
-
-COPY . /app
-
-COPY amazon-dash.yml /etc
+COPY scan.sh http_server.sh entrypoint.sh /app/
 
 WORKDIR /app
 
-RUN mkdir /data && mkdir /data/import_multi && mkdir /data/import && mkdir /data/export
+RUN chmod +x /app/scan.sh /app/http_server.sh /app/entrypoint.sh \
+    && mkdir -p /data/import /data/export
+
+EXPOSE ${HTTP_PORT}
 
 ENTRYPOINT ["/app/entrypoint.sh"]

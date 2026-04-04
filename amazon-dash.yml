@@ -1,8 +1,0 @@
-settings:
-  # On seconds. Minimum time that must pass between pulsations.
-  delay: 10
-devices:
- 78:E1:03:C8:AF:64:
-    name: Multi-Druck-Abschliessen
-    user: root
-    cmd: touch /app/button-pressed.txt && sleep 15 && rm /app/button-pressed.txt
