@@ -81,10 +81,12 @@ The scanner profile name determines both the processing mode and the pipeline. C
 
 | Scanner profile / filename | Mode | Pipeline |
 |---|---|---|
-| `scan-bw-001.pdf` | Single – process immediately | ImageMagick B&W |
-| `scan-color-001.pdf` | Single – process immediately | Ghostscript color |
-| `scan-bw-multi-001.pdf` | Multi – collect, wait for trigger, merge | ImageMagick B&W |
-| `scan-color-multi-001.pdf` | Multi – collect, wait for trigger, merge | Ghostscript color |
+| `scan-bw.pdf`, `scan-bw2.pdf`, ... | Single – process immediately | ImageMagick B&W |
+| `scan-color.pdf`, `scan-color2.pdf`, ... | Single – process immediately | Ghostscript color |
+| `scan-bw-multi.pdf`, `scan-bw-multi2.pdf`, ... | Multi – collect, wait for trigger, merge | ImageMagick B&W |
+| `scan-color-multi.pdf`, `scan-color-multi2.pdf`, ... | Multi – collect, wait for trigger, merge | Ghostscript color |
+
+**Page numbering:** The first scan has no number suffix (e.g. `scan-bw-multi.pdf`), subsequent pages increment numerically (e.g. `scan-bw-multi2.pdf`, `scan-bw-multi3.pdf`, ...). All common numbering schemes are supported – no suffix, `1`, `2`, `10` as well as zero-padded `0001`, `0002`, `0010`. Pages are always merged in natural numeric order (8 → 9 → 10 → 11), not lexicographic order (which would incorrectly produce 1 → 10 → 11 → 2 → 3).
 
 **Detection logic:**
 - Multi is detected by substring match: filename contains `MULTI_PATTERN` (`multi` by default)
