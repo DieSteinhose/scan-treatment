@@ -110,10 +110,11 @@ process_color() {
     && log_ok "Color processing complete"
 }
 
-# Selects B&W or color processing based on filename prefix
+# Selects B&W or color processing based on filename prefix.
+# Optional third argument overrides the filename used for detection (e.g. for merged files).
 process_pdf() {
-    local input="$1" output="$2"
-    if [[ "$(basename "$input")" == ${SW_PATTERN}* ]]; then
+    local input="$1" output="$2" detect_name="${3:-$(basename "$1")}"
+    if [[ "$detect_name" == ${SW_PATTERN}* ]]; then
         process_bw "$input" "$output"
     else
         process_color "$input" "$output"
@@ -196,7 +197,8 @@ process_batch() {
     output_file="${EXPORT_DIR}${timestamp}${first_filename}"
 
     if merge_pdfs "$WATCH_DIR" "$merge_tmp"; then
-        if process_pdf "$merge_tmp" "$output_file"; then
+        # Use first_filename for B&W/color detection since the merge tmp has no meaningful name
+        if process_pdf "$merge_tmp" "$output_file" "$first_filename"; then
             # Clean up all source PDFs and the temp merge file
             find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -delete
             log_ok "Import directory cleaned up"
