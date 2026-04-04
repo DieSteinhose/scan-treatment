@@ -9,10 +9,11 @@ VERSION="4.0.0"
 WATCH_DIR="${WATCH_DIR:-/data/import/}"
 EXPORT_DIR="${EXPORT_DIR:-/data/export/}"
 HTTP_PORT="${HTTP_PORT:-8080}"
-BUTTON_PAUSE="${BUTTON_PAUSE:-1800}"    # seconds to wait for trigger before timeout
-FAIL_PAUSE="${FAIL_PAUSE:-60}"          # seconds between Paperless upload retries
-SW_PATTERN="${SW_PATTERN:-scan-sw}"     # filename prefix identifying B&W scans
-DISABLE_MULTI="${DISABLE_MULTI:-false}" # true = process each file immediately (printer handles multi-page)
+BUTTON_PAUSE="${BUTTON_PAUSE:-1800}"      # seconds to wait for trigger before timeout
+FAIL_PAUSE="${FAIL_PAUSE:-60}"           # seconds between Paperless upload retries
+SW_PATTERN="${SW_PATTERN:-scan-bw}"      # filename prefix identifying B&W scans (single: scan-bw*, multi: scan-bw-multi*)
+MULTI_PATTERN="${MULTI_PATTERN:-multi}"  # substring identifying multi-page scans (matches scan-bw-multi*, scan-color-multi*)
+DISABLE_MULTI="${DISABLE_MULTI:-false}"  # true = treat every file as single, ignore MULTI_PATTERN
 PAPERLESS_URL="${PAPERLESS_URL:-}"
 PAPERLESS_TOKEN="${PAPERLESS_TOKEN:-}"
 TG_API_KEY="${TG_API_KEY:-}"
@@ -258,11 +259,16 @@ main() {
     log "============================================="
     log "  Scan Processor v$VERSION"
     log "============================================="
-    log "Mode:      $([ "$DISABLE_MULTI" == "true" ] && echo "Single (DISABLE_MULTI=true)" || echo "Multi  (waiting for trigger after first scan)")"
-    log "Watch:     $WATCH_DIR"
-    log "Export:    $EXPORT_DIR"
-    log "B&W pattern: ${SW_PATTERN}*  /  everything else → color"
-    log "HTTP port: $HTTP_PORT  (GET/POST /trigger)"
+    log "Watch:       $WATCH_DIR"
+    log "Export:      $EXPORT_DIR"
+    log "B&W pattern:   ${SW_PATTERN}*  (e.g. scan-bw-001.pdf, scan-bw-multi-001.pdf)"
+    if [[ "$DISABLE_MULTI" == "true" ]]; then
+        log "Multi mode:    disabled (DISABLE_MULTI=true) – every file processed immediately"
+    else
+        log "Multi pattern: *${MULTI_PATTERN}*  (e.g. scan-bw-multi*, scan-color-multi*)"
+        log "Single:        everything else (e.g. scan-bw*, scan-color*)"
+    fi
+    log "HTTP port:   $HTTP_PORT  (GET/POST /trigger)"
     [[ -n "$PAPERLESS_URL" ]] \
         && log "Paperless: $PAPERLESS_URL" \
         || log_warn "Paperless: not configured – files will remain in $EXPORT_DIR"
@@ -283,11 +289,10 @@ main() {
 
         sleep 1  # ensure the file is fully written before processing
 
-        if [[ "$DISABLE_MULTI" == "true" ]]; then
-            # Single mode: process immediately (works with multi-page PDFs too)
-            process_single "$FILENAME"
-        else
-            # Multi mode: first file starts a background batch job
+        if [[ "$DISABLE_MULTI" != "true" && "$FILENAME" == *"${MULTI_PATTERN}"* ]]; then
+            # Multi mode: filename matches MULTI_PATTERN (e.g. scan-multi*.pdf)
+            # First matching file starts a background batch job;
+            # subsequent files just land in the directory and get merged later.
             if [[ -f "$LOCK_FILE" ]]; then
                 log "Batch in progress – '$FILENAME' added to current stack"
             else
@@ -295,6 +300,9 @@ main() {
                 log "New batch started by: $FILENAME"
                 process_batch "$FILENAME" &
             fi
+        else
+            # Single mode: process immediately (also handles native multi-page PDFs)
+            process_single "$FILENAME"
         fi
     done < <(inotifywait -m -e close_write --format "%f" "$WATCH_DIR" 2>/dev/null)
 }

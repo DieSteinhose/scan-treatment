@@ -40,8 +40,9 @@ All settings are controlled via environment variables.
 |---|---|---|
 | `WATCH_DIR` | `/data/import/` | Directory watched for incoming scans |
 | `EXPORT_DIR` | `/data/export/` | Output directory when Paperless is not configured |
-| `SW_PATTERN` | `scan-sw` | Filename prefix identifying B&W scans |
-| `DISABLE_MULTI` | `false` | `true` = process each file immediately, no merging |
+| `SW_PATTERN` | `scan-bw` | Filename prefix identifying B&W scans |
+| `MULTI_PATTERN` | `multi` | Substring identifying multi-page scans |
+| `DISABLE_MULTI` | `false` | `true` = ignore `MULTI_PATTERN`, process every file immediately |
 | `PAPERLESS_URL` | – | Base URL of your Paperless-ngx instance |
 | `PAPERLESS_TOKEN` | – | API token (Paperless → Settings → API Token) |
 | `HTTP_PORT` | `8080` | Port for the HTTP trigger endpoint |
@@ -76,12 +77,19 @@ Available endpoints:
 
 ## Filename convention
 
-The scan filename determines which processing pipeline is used:
+The scanner profile name determines both the processing mode and the pipeline. Configure your scanner to use these prefixes:
 
-| Filename starts with | Pipeline |
-|---|---|
-| `scan-sw` (configurable via `SW_PATTERN`) | ImageMagick B&W optimization |
-| anything else | Ghostscript color optimization |
+| Scanner profile / filename | Mode | Pipeline |
+|---|---|---|
+| `scan-bw-001.pdf` | Single – process immediately | ImageMagick B&W |
+| `scan-color-001.pdf` | Single – process immediately | Ghostscript color |
+| `scan-bw-multi-001.pdf` | Multi – collect, wait for trigger, merge | ImageMagick B&W |
+| `scan-color-multi-001.pdf` | Multi – collect, wait for trigger, merge | Ghostscript color |
+
+**Detection logic:**
+- Multi is detected by substring match: filename contains `MULTI_PATTERN` (`multi` by default)
+- B&W is detected by prefix match: filename starts with `SW_PATTERN` (`scan-bw` by default)
+- Both checks are independent, so `scan-bw-multi` correctly triggers multi mode **and** B&W processing.
 
 ## docker-compose example
 

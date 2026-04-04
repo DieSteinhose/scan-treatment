@@ -8,7 +8,8 @@ ENV FAIL_PAUSE=60 \
     WATCH_DIR=/data/import/ \
     EXPORT_DIR=/data/export/ \
     DISABLE_MULTI=false \
-    SW_PATTERN=scan-sw \
+    SW_PATTERN=scan-bw \
+    MULTI_PATTERN=multi \
     PAPERLESS_URL= \
     PAPERLESS_TOKEN=
 
