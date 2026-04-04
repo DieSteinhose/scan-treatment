@@ -6,8 +6,10 @@ Docker container for automatic scanner PDF processing. Optimizes black & white a
 
 The container watches an input directory using `inotifywait`. When the scanner drops a file, it is processed immediately (single mode) or collected with other pages and processed after a trigger (multi mode).
 
-**Black & white** (`scan-sw*.pdf`): ImageMagick – deskew, normalize, posterize, LZW compression  
+**Black & white** (`scan-bw*.pdf`): ImageMagick – deskew, normalize, posterize, LZW compression  
 **Color** (everything else): Ghostscript – bicubic downsampling to 300 DPI, `/ebook` preset
+
+> Processing settings are optimized for the **HP LaserJet MFP M130fw** at a scan resolution of **600 DPI**. Other scanners or resolutions may require tuning of the ImageMagick/Ghostscript parameters. If the results are insufficient for your device, feel free to fork this repository and adjust the parameters in `scan.sh` to fit your needs.
 
 ### Single mode (`DISABLE_MULTI=true`)
 
