@@ -299,6 +299,28 @@ main() {
         done <<< "$leftover"
     fi
 
+    # Process any files already present in the watch dir (copied while offline)
+    local pending
+    pending=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -not -name "$MERGE_NAME" 2>/dev/null)
+    if [[ -n "$pending" ]]; then
+        log_warn "Found existing files in $WATCH_DIR – processing..."
+        while IFS= read -r file; do
+            local filename
+            filename=$(basename "$file")
+            if [[ "$DISABLE_MULTI" != "true" && "$filename" == *"${MULTI_PATTERN}"* ]]; then
+                if [[ ! -f "$LOCK_FILE" ]]; then
+                    touch "$LOCK_FILE"
+                    log "New batch started by: $filename"
+                    process_batch "$filename" &
+                else
+                    log "Batch in progress – '$filename' added to current stack"
+                fi
+            else
+                process_single "$filename" &
+            fi
+        done <<< "$pending"
+    fi
+
     start_http_server
 
     while true; do
