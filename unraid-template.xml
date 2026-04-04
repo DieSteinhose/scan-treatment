@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>scan-treatment</Name>
-  <Repository>ghcr.io/DieSteinhose/scan-treatment:latest</Repository>
-  <Registry>https://ghcr.io/DieSteinhose/scan-treatment</Registry>
+  <Repository>ghcr.io/diesteinhose/scan-treatment:latest</Repository>
+  <Registry>https://ghcr.io/diesteinhose/scan-treatment</Registry>
   <Network>bridge</Network>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
   <Overview>Automatic scanner PDF processing. Optimizes B&amp;W and color scans and uploads them directly to Paperless-ngx via API. Multi-page document assembly is triggered via a Home Assistant button. Optimized for HP LaserJet MFP M130fw at 600 DPI.</Overview>
   <Category>Tools:</Category>
   <WebUI>http://[IP]:[PORT:8080]/health</WebUI>
-  <Icon>https://raw.githubusercontent.com/DieSteinhose/scan-treatment/main/icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/diesteinhose/scan-treatment/main/icon.png</Icon>
 
   <!-- Data -->
   <Config Name="Data" Target="/data" Default="/mnt/user/appdata/scan-treatment" Mode="rw" Description="Base data directory. Contains /import (scanner target) and /export (processed files)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/scan-treatment</Config>

@@ -120,7 +120,7 @@ Open the Unraid terminal and run:
 
 ```bash
 wget -O /boot/config/plugins/dockerMan/templates-user/scan-treatment.xml \
-  https://raw.githubusercontent.com/DieSteinhose/scan-treatment/main/unraid-template.xml
+  https://raw.githubusercontent.com/diesteinhose/scan-treatment/main/unraid-template.xml
 ```
 
 Then go to **Docker → Add Container** and select `scan-treatment` from the template list.
@@ -130,7 +130,7 @@ Then go to **Docker → Add Container** and select `scan-treatment` from the tem
 Pre-built images are available from the GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/DieSteinhose/scan-treatment:latest
+docker pull ghcr.io/diesteinhose/scan-treatment:latest
 ```
 
 Or build locally:
