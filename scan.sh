@@ -102,7 +102,7 @@ process_bw() {
 process_color() {
     local input="$1" output="$2"
     log "Processing: color"
-    ghostscript -q -dNOPAUSE -dBATCH -dSAFER \
+    gs -q -dNOPAUSE -dBATCH -dSAFER \
         -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook \
         -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 \
         -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 \
