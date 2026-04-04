@@ -77,7 +77,7 @@ upload_to_paperless_with_retry() {
     local file="$1"
     local attempt=0
     until upload_to_paperless "$file"; do
-        (( attempt++ )) || true
+        attempt=$((attempt + 1))
         if [[ $attempt -eq 1 ]]; then
             tg_send "ERROR: Paperless upload failed – retrying every ${FAIL_PAUSE}s until successful."
         fi
@@ -308,8 +308,6 @@ main() {
             # Skip the internal merge temp file and non-PDFs
             [[ "$FILENAME" == "$MERGE_NAME" ]] && continue
             [[ "$FILENAME" != *.pdf ]] && continue
-
-            sleep 1  # ensure the file is fully written before processing
 
             if [[ "$DISABLE_MULTI" != "true" && "$FILENAME" == *"${MULTI_PATTERN}"* ]]; then
                 # Multi mode: filename matches MULTI_PATTERN (e.g. scan-multi*.pdf)
