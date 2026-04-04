@@ -114,6 +114,17 @@ services:
       TG_CHAT_ID: "123456789"       # optional
 ```
 
+## Unraid
+
+Open the Unraid terminal and run:
+
+```bash
+wget -O /boot/config/plugins/dockerMan/templates-user/scan-treatment.xml \
+  https://raw.githubusercontent.com/DieSteinhose/scan-treatment/main/unraid-template.xml
+```
+
+Then go to **Docker → Add Container** and select `scan-treatment` from the template list.
+
 ## Build
 
 Pre-built images are available from the GitHub Container Registry:
