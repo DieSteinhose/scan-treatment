@@ -231,7 +231,12 @@ process_single() {
     if process_pdf "${WATCH_DIR}${filename}" "$output_file"; then
         rm -f "${WATCH_DIR}${filename}"
         log_ok "Original removed"
-        upload_to_paperless_with_retry "$output_file"
+
+        if check_file_size "$output_file"; then
+            upload_to_paperless_with_retry "$output_file"
+        else
+            log_err "Skipping upload due to failed size check: $output_file"
+        fi
     else
         log_err "Processing failed: $filename"
     fi
