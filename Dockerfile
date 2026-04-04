@@ -34,4 +34,7 @@ RUN chmod +x /app/scan.sh /app/http_server.sh /app/entrypoint.sh \
 
 EXPOSE ${HTTP_PORT}
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost:${HTTP_PORT}/health || exit 1
+
 ENTRYPOINT ["/app/entrypoint.sh"]
