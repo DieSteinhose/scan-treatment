@@ -296,29 +296,37 @@ main() {
 
     start_http_server
 
-    while IFS= read -r FILENAME; do
-        # Skip the internal merge temp file and non-PDFs
-        [[ "$FILENAME" == "$MERGE_NAME" ]] && continue
-        [[ "$FILENAME" != *.pdf ]] && continue
+    while true; do
+        log "Watching $WATCH_DIR for new scans..."
 
-        sleep 1  # ensure the file is fully written before processing
+        while IFS= read -r FILENAME; do
+            # Skip the internal merge temp file and non-PDFs
+            [[ "$FILENAME" == "$MERGE_NAME" ]] && continue
+            [[ "$FILENAME" != *.pdf ]] && continue
 
-        if [[ "$DISABLE_MULTI" != "true" && "$FILENAME" == *"${MULTI_PATTERN}"* ]]; then
-            # Multi mode: filename matches MULTI_PATTERN (e.g. scan-multi*.pdf)
-            # First matching file starts a background batch job;
-            # subsequent files just land in the directory and get merged later.
-            if [[ -f "$LOCK_FILE" ]]; then
-                log "Batch in progress – '$FILENAME' added to current stack"
+            sleep 1  # ensure the file is fully written before processing
+
+            if [[ "$DISABLE_MULTI" != "true" && "$FILENAME" == *"${MULTI_PATTERN}"* ]]; then
+                # Multi mode: filename matches MULTI_PATTERN (e.g. scan-multi*.pdf)
+                # First matching file starts a background batch job;
+                # subsequent files just land in the directory and get merged later.
+                if [[ -f "$LOCK_FILE" ]]; then
+                    log "Batch in progress – '$FILENAME' added to current stack"
+                else
+                    touch "$LOCK_FILE"
+                    log "New batch started by: $FILENAME"
+                    process_batch "$FILENAME" &
+                fi
             else
-                touch "$LOCK_FILE"
-                log "New batch started by: $FILENAME"
-                process_batch "$FILENAME" &
+                # Single mode: run in background so the event loop stays responsive
+                # while processing or waiting for a Paperless retry.
+                process_single "$FILENAME" &
             fi
-        else
-            # Single mode: process immediately (also handles native multi-page PDFs)
-            process_single "$FILENAME"
-        fi
-    done < <(inotifywait -m -e close_write --format "%f" "$WATCH_DIR" 2>/dev/null)
+        done < <(inotifywait -m -e close_write --format "%f" "$WATCH_DIR" 2>/dev/null)
+
+        log_warn "inotifywait exited unexpectedly – restarting in 5 seconds..."
+        sleep 5
+    done
 }
 
 main
