@@ -22,11 +22,13 @@ case "${path%%\?*}" in
     /trigger|/trigger/)
         touch "${TRIGGER_FILE:-/tmp/scan_trigger}"
         respond "200 OK" "Triggered!"
+        echo "[$(date '+%H:%M:%S')] [HTTP] Trigger received" >&2
         ;;
     /health|/health/)
         respond "200 OK" "OK"
         ;;
     *)
         respond "404 Not Found" "Not found. Available endpoints: /trigger  /health"
+        echo "[$(date '+%H:%M:%S')] [HTTP] 404 – unknown path: $path" >&2
         ;;
 esac
