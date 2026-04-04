@@ -66,21 +66,25 @@ upload_to_paperless() {
     if [[ "$http_code" =~ ^2 ]]; then
         log_ok "Paperless upload successful (HTTP $http_code)"
         rm -f "$file"
-        tg_send "New document successfully uploaded to Paperless!"
         return 0
     else
         log_err "Paperless upload failed (HTTP $http_code)"
-        tg_send "ERROR: Paperless upload failed (HTTP $http_code)"
         return 1
     fi
 }
 
 upload_to_paperless_with_retry() {
     local file="$1"
+    local attempt=0
     until upload_to_paperless "$file"; do
-        log_warn "Retrying in $FAIL_PAUSE seconds..."
+        (( attempt++ )) || true
+        if [[ $attempt -eq 1 ]]; then
+            tg_send "ERROR: Paperless upload failed – retrying every ${FAIL_PAUSE}s until successful."
+        fi
+        log_warn "Retrying in $FAIL_PAUSE seconds (attempt $attempt)..."
         sleep "$FAIL_PAUSE"
     done
+    tg_send "Document successfully uploaded to Paperless!"
 }
 
 # ── PDF processing ─────────────────────────────────────────────────────────────
