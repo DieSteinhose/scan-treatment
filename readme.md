@@ -46,7 +46,7 @@ All settings are controlled via environment variables.
 | `MULTI_PATTERN` | `multi` | Substring identifying multi-page scans |
 | `DISABLE_MULTI` | `false` | `true` = ignore `MULTI_PATTERN`, process every file immediately |
 | `PAPERLESS_URL` | – | Base URL of your Paperless-ngx instance |
-| `PAPERLESS_TOKEN` | – | API token (Paperless → Settings → API Token) |
+| `PAPERLESS_TOKEN` | – | API token – found in the Django admin panel (`/admin`) under **Tokens** |
 | `HTTP_PORT` | `8080` | Port for the HTTP trigger endpoint |
 | `BUTTON_PAUSE` | `1800` | Seconds to wait for trigger before auto-proceeding |
 | `FAIL_PAUSE` | `60` | Seconds between Paperless upload retries |
