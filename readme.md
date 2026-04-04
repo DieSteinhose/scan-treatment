@@ -27,7 +27,7 @@ Scan page 1 → scan page 2 → ... → HA button → process + upload to Paperl
 
 ```bash
 docker run -d \
-  -v /path/to/scans:/data/import \
+  -v /path/to/data:/data \
   -p 8080:8080 \
   -e PAPERLESS_URL=http://paperless:8000 \
   -e PAPERLESS_TOKEN=your-api-token \
@@ -105,7 +105,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - /mnt/scanner/import:/data/import
+      - /mnt/scanner:/data
     environment:
       PAPERLESS_URL: http://paperless-ngx:8000
       PAPERLESS_TOKEN: your-api-token
