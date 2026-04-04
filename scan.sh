@@ -257,7 +257,7 @@ main() {
     trap cleanup EXIT INT TERM
 
     log "============================================="
-    log "  Scan Processor v$VERSION"
+    log "  Scan Treatment v$VERSION"
     log "============================================="
     log "Watch:       $WATCH_DIR"
     log "Export:      $EXPORT_DIR"
