@@ -1,6 +1,4 @@
-FROM dpokidov/imagemagick:latest-ubuntu
-
-# Nicht über apt installieren: ghostscript (kommt aus dem Base-Image)
+FROM alpine:3.23
 
 ENV FAIL_PAUSE=60 \
     BUTTON_PAUSE=1800 \
@@ -13,15 +11,19 @@ ENV FAIL_PAUSE=60 \
     PAPERLESS_URL= \
     PAPERLESS_TOKEN=
 
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
+    bash \
+    imagemagick \
+    imagemagick-pdf \
+    ghostscript \
+    ghostscript-fonts \
     poppler-utils \
     inotify-tools \
     curl \
     socat \
-    libncurses6 \
+    ncurses \
     htop \
-    nano \
-    && rm -rf /var/lib/apt/lists/*
+    nano
 
 COPY scan.sh http_server.sh entrypoint.sh /app/
 
