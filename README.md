@@ -13,14 +13,14 @@ The container watches an input directory using `inotifywait`. When the scanner d
 
 ### Single mode (`DISABLE_MULTI=true`)
 
-Every incoming PDF is processed immediately on arrival. Best suited for printers that natively produce multi-page PDFs. Both ImageMagick and Ghostscript handle multi-page PDFs correctly without any additional merging step.
+Every incoming PDF is processed immediately on arrival. Use this if your printer is capable of producing multi-page PDFs natively — in that case the entire multi-page document arrives as a single file and no merging or trigger is needed. Home Assistant integration and the `/trigger` endpoint can be ignored entirely in this mode.
 
-### Multi mode (default)
+### Multi mode (default, `DISABLE_MULTI=false`)
 
-The first incoming scan starts a collection phase. Additional pages can keep arriving. Once the Home Assistant button fires the trigger (or `BUTTON_PAUSE` seconds elapse), all collected PDFs are merged, processed, and uploaded to Paperless.
+Use this if your printer creates one separate PDF per scanned page and cannot combine them into a single file itself. The first incoming scan starts a collection phase. Additional pages keep arriving as individual files. Once the Home Assistant button fires the trigger (or `BUTTON_PAUSE` seconds elapse), all collected PDFs are merged, processed, and uploaded to Paperless.
 
 ```
-Scan page 1 → scan page 2 → ... → HA button → process + upload to Paperless
+Scan page 1 → scan page 2 → ... → HA button → merge → process → upload to Paperless
 ```
 
 ## Quick start
@@ -54,6 +54,8 @@ All settings are controlled via environment variables.
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 
 ## Home Assistant integration
+
+> **Only required in multi mode (`DISABLE_MULTI=false`).** If your printer produces multi-page PDFs natively, set `DISABLE_MULTI=true` and skip this section entirely.
 
 The container exposes a lightweight HTTP server. A `GET` or `POST` to `/trigger` fires the multi-mode processing.
 
