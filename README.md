@@ -188,4 +188,4 @@ docker build -t scan-treatment .
 - Failed Paperless uploads are retried indefinitely every `FAIL_PAUSE` seconds.
 - Telegram notifications are fully optional. Nothing is sent if `TG_API_KEY` is unset.
 - In multi mode, only one batch runs at a time. Files arriving during an active batch are automatically added to the current stack.
-- Printer notifications (`PRINTER_NOTIFY=true`) work only in multi mode. When the first page of a batch arrives, the matching scan job's name in the printer's scan menu changes to e.g. `My Scan Job [scan... 2]`. After processing it updates to `[OK 14:32]` or `[ERR 14:32]`. Tested with HP LaserJet MFP M130fw via the LEDM Folder API.
+- Printer notifications (`PRINTER_NOTIFY=true`) work only in multi mode. When the first page of a batch arrives, the matching scan job's name in the printer's scan menu changes to e.g. `My Scan Job [scan 2]`. After processing it updates to `[OK 14:32]` or `[ERR 14:32]`. Tested with HP LaserJet MFP M130fw via the LEDM Folder API.

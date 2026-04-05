@@ -45,8 +45,9 @@ log_warn() { log "${yellow}WARN: $*${reset}"; }
 
 # ── Printer scan-menu notifications (optional, multi-mode only) ───────────────
 # The matching job's display name is updated at two points:
-#   collecting: "My Scan Job [scan... 2]"  – while waiting for the trigger button (count updates per page)
+#   collecting: "My Scan Job [scan 2]"  – while waiting for the trigger button (count updates per page)
 #   ok/err:     "My Scan Job [OK 14:32]"  – after processing completes
+# Uses the HP EWS web form which works immediately after scanning (LEDM PUT is locked ~8 min post-scan).
 # Requires PRINTER_IP. If PRINTER_USER is set, only jobs whose name contains
 # that string are updated. All failures are silent.
 
@@ -80,44 +81,76 @@ _printer_find_job() {
     return 1
 }
 
-# Update the display name of the matching multi-page scan job.
+# Update the display name of the matching multi-page scan job via EWS web form.
 # status: collecting (waiting for pages) | ok | err
 printer_notify() {
     local filename="$1" status="$2"
     [[ "$PRINTER_NOTIFY" != "true" ]] && return 0
     local job_id
     job_id=$(_printer_find_job "$filename") || return 0
-    local url="http://${PRINTER_IP}/DevMgmt/Folder/PredefinedJobs/${job_id}"
-    local xml
-    xml=$(curl -sf --max-time 5 "$url" 2>/dev/null) || return 0
-    # Strip any existing status suffix to get the clean base name
-    local base_name
-    base_name=$(printf '%s' "$xml" | \
-        grep -o '<dd:Name>[^<]*</dd:Name>' | sed 's|<[^>]*>||g; s| \[.*\]||')
+
     local suffix
     case "$status" in
         collecting)
             local count
             count=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
                 -not -name "$MERGE_NAME" 2>/dev/null | wc -l | tr -d ' ')
-            suffix="[scan... ${count}]"
+            suffix="[scan ${count}]"
             ;;
-        ok)         suffix="[OK $(date '+%H:%M')]" ;;
-        *)          suffix="[ERR $(date '+%H:%M')]" ;;
+        ok)  suffix="[OK $(date '+%H:%M')]"  ;;
+        *)   suffix="[ERR $(date '+%H:%M')]" ;;
     esac
-    local escaped
-    escaped=$(printf '%s %s' "$base_name" "$suffix" | sed 's/[&\]/\\&/g; s|/|\\/|g')
-    local updated
-    updated=$(printf '%s' "$xml" | \
-        sed "s|<dd:Name>[^<]*</dd:Name>|<dd:Name>${escaped}</dd:Name>|")
+
+    # Fetch current EWS job configuration form
+    local html
+    html=$(curl -sf --max-time 10 \
+        "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html?tab=Scan&menu=ScantoCfg&entryNum=${job_id}" \
+        2>/dev/null) || return 0
+
+    # Extract current base name and strip any existing status suffix
+    local base_name
+    base_name=$(printf '%s' "$html" | grep -i 'name="displayName"' | \
+        grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//; s/ \[.*\]//')
+
+    # Build new name truncated to fit within printer's 25-char limit
+    local max_base=$(( 25 - 1 - ${#suffix} ))
+    local new_name="${base_name:0:$max_base} ${suffix}"
+
+    # Collect all INPUT field values for the form POST
+    local -a curl_args=()
+    while IFS= read -r tag; do
+        local name type value
+        name=$(printf '%s' "$tag" | grep -oi 'name="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
+        type=$(printf '%s' "$tag" | grep -oi 'type="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
+        [[ -z "$name" ]] && continue
+        # Skip all submit buttons except Save_button
+        [[ "${type,,}" == "submit" && "$name" != "Save_button" ]] && continue
+        [[ "${type,,}" == "button" || "${type,,}" == "image" ]] && continue
+        value=$(printf '%s' "$tag" | grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
+        [[ "$name" == "displayName" ]] && value="$new_name"
+        curl_args+=("--data-urlencode" "${name}=${value}")
+    done < <(printf '%s' "$html" | grep -i '<INPUT')
+
+    # Add SELECTED values from SELECT elements
+    for sel_name in fileType DefaultPaperSize ScanQualitySelection scanColorSelection; do
+        local sel_value
+        sel_value=$(printf '%s' "$html" | \
+            awk "/<SELECT[^>]*name=\"${sel_name}\"/,/<\/SELECT>/" | \
+            grep -i 'SELECTED' | \
+            grep -oi 'value="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
+        [[ -n "$sel_value" ]] && curl_args+=("--data-urlencode" "${sel_name}=${sel_value}")
+    done
+
+    # POST to EWS; printer returns 303 redirect on both success and failure
     local http_code
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-        -X PUT -H "Content-Type: text/xml; charset=utf-8" \
-        -d "$updated" "$url" 2>/dev/null) || true
-    if [[ "$http_code" =~ ^2 ]]; then
-        log "Printer: job ${job_id} → '${base_name} ${suffix}'"
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+        "${curl_args[@]}" \
+        "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html/config" 2>/dev/null) || true
+
+    if [[ "$http_code" == "303" || "$http_code" =~ ^2 ]]; then
+        log "Printer: job ${job_id} → '${new_name}'"
     else
-        log_warn "Printer: job ${job_id} PUT failed (HTTP ${http_code:-timeout})"
+        log_warn "Printer: job ${job_id} EWS POST failed (HTTP ${http_code:-timeout})"
     fi
 }
 
