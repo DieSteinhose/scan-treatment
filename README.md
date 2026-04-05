@@ -6,6 +6,8 @@ Docker container for automatic scanner PDF processing. Optimizes black & white a
 
 The container watches an input directory using `inotifywait`. When the scanner drops a file, it is processed immediately (single mode) or collected with other pages and processed after a trigger (multi mode).
 
+The `/data` directory is mounted into the container as a bind volume. A typical setup is to back it with an SMB share on the host so the scanner can drop files directly into `/data/import` over the network. Mounting the share on the host is done outside the container. The container only watches the directory.
+
 **Black & white** (`scan-bw*.pdf`): ImageMagick – deskew, normalize, posterize, LZW compression at `BW_DPI` DPI (default: 300)  
 **Color** (everything else): Ghostscript – bicubic downsampling to 300 DPI, `/ebook` preset
 
