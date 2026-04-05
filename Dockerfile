@@ -18,7 +18,6 @@ RUN apk add --no-cache \
     imagemagick \
     imagemagick-pdf \
     ghostscript \
-    ghostscript-fonts \
     poppler-utils \
     inotify-tools \
     curl \
