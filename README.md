@@ -119,18 +119,27 @@ The scanner profile name determines both the processing mode and the pipeline. C
 ```yaml
 services:
   scan-treatment:
-    image: scan-treatment:latest
+    image: ghcr.io/diesteinhose/scan-treatment:latest
+    container_name: scan-treatment
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
       - /mnt/scanner:/data
     environment:
+      TZ: Europe/Berlin
       PAPERLESS_URL: http://paperless-ngx:8000
       PAPERLESS_TOKEN: your-api-token
-      BUTTON_PAUSE: "600"
-      TG_API_KEY: "123456:ABC..."   # optional
-      TG_CHAT_ID: "123456789"       # optional
+      DISABLE_MULTI: "false"
+      SW_PATTERN: scan-bw
+      MULTI_PATTERN: multi
+      BUTTON_PAUSE: "1800"
+      BW_DENSITY: "300"
+      # BW_PARAMS: "-chop 5x5 ..."     # optional: override ImageMagick parameters
+      # COLOR_PARAMS: "-q ..."          # optional: override Ghostscript parameters
+      # TG_API_KEY: "123456:ABC..."     # optional: Telegram bot token
+      # TG_CHAT_ID: "123456789"         # optional: Telegram chat ID
+      # TG_NOTIFY_SUCCESS: "false"      # optional: notify on successful uploads
 ```
 
 ## Unraid
