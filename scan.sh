@@ -242,6 +242,8 @@ process_batch() {
     fi
 
     rm -f "$LOCK_FILE" "$trigger_ref"
+    # Clear seen-locks so the same filenames can be logged again in the next batch
+    rm -rf /tmp/scan_seen_*.lock
 
     # Files that arrived during this batch were not picked up by inotifywait.
     # If any remain, chain directly into a new batch without waiting for a new inotify event.
@@ -392,7 +394,11 @@ main() {
                 # First matching file starts a background batch job;
                 # subsequent files just land in the directory and get merged later.
                 if [[ -f "$LOCK_FILE" ]]; then
-                    log "Batch in progress – '$FILENAME' added to current stack"
+                    # Suppress duplicate log messages for the same filename (SMB fires multiple events)
+                    local seen_lock="/tmp/scan_seen_${FILENAME}.lock"
+                    if mkdir "$seen_lock" 2>/dev/null; then
+                        log "Batch in progress – '$FILENAME' added to current stack"
+                    fi
                 else
                     touch "$LOCK_FILE"
                     log "New batch started by: $FILENAME"
