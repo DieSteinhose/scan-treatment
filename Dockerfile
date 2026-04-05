@@ -23,9 +23,7 @@ RUN apk add --no-cache \
     inotify-tools \
     curl \
     socat \
-    tzdata \
-    htop \
-    nano
+    tzdata
 
 COPY scan.sh http_server.sh entrypoint.sh /app/
 
