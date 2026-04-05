@@ -16,7 +16,7 @@ MULTI_PATTERN="${MULTI_PATTERN:-multi}"  # substring identifying multi-page scan
 DISABLE_MULTI="${DISABLE_MULTI:-false}"  # true = treat every file as single, ignore MULTI_PATTERN
 BW_DPI="${BW_DPI:-300}"
 BW_PARAMS="${BW_PARAMS:--chop 5x5 -deskew 60% +repage -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW}"
-COLOR_PARAMS="${COLOR_PARAMS:--q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300}"
+COLOR_PARAMS="${COLOR_PARAMS:--q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -dFastWebView=false}"
 PAPERLESS_URL="${PAPERLESS_URL:-}"
 PAPERLESS_TOKEN="${PAPERLESS_TOKEN:-}"
 TG_API_KEY="${TG_API_KEY:-}"

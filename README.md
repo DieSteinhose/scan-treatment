@@ -21,7 +21,7 @@ Full command: `magick -density $BW_DPI <input> $BW_PARAMS <output>`
 
 **Default `COLOR_PARAMS`** (Ghostscript, parameters before `-sOutputFile`):
 ```
--q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300
+-q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300 -dFastWebView=false
 ```
 Full command: `gs $COLOR_PARAMS -sOutputFile=<output> <input>`
 
