@@ -210,6 +210,8 @@ process_batch() {
     if merge_pdfs "$WATCH_DIR" "$merge_tmp" "$trigger_ref"; then
         # Use first_filename for B&W/color detection since the merge tmp has no meaningful name
         if process_pdf "$merge_tmp" "$output_file" "$first_filename"; then
+            # Remove merge temp explicitly (it is newer than trigger_ref and won't be caught below)
+            rm -f "$merge_tmp"
             # Only delete files that were present at trigger time; newer files belong to the next batch
             find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -not -newer "$trigger_ref" -delete
             log_ok "Import directory cleaned up"
@@ -228,6 +230,18 @@ process_batch() {
     fi
 
     rm -f "$LOCK_FILE" "$trigger_ref"
+
+    # Files that arrived during this batch were not picked up by inotifywait.
+    # If any remain, chain directly into a new batch without waiting for a new inotify event.
+    local next
+    next=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -not -name "$MERGE_NAME" 2>/dev/null | sort -V | head -1)
+    if [[ -n "$next" ]]; then
+        local next_name
+        next_name=$(basename "$next")
+        touch "$LOCK_FILE"
+        log "Files arrived during batch – chaining new batch: $next_name"
+        process_batch "$next_name" &
+    fi
 }
 
 # ── Single mode: process each file immediately ─────────────────────────────────
