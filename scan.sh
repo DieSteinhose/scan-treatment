@@ -44,9 +44,10 @@ log_err()  { log "${red}ERROR: $*${reset}" >&2; }
 log_warn() { log "${yellow}WARN: $*${reset}"; }
 
 # ── Printer scan-menu notifications (optional, multi-mode only) ───────────────
-# The matching job's display name is updated at two points:
-#   collecting: "My Scan Job [scan 2]"  – while waiting for the trigger button (count updates per page)
-#   ok/err:     "My Scan Job [OK 14:32]"  – after processing completes
+# The matching job's display name is updated at three points:
+#   collecting:  "My Scan Job [scan 2]"   – while waiting for the trigger button (count updates per page)
+#   processing:  "My Scan Job [proc...]"  – after trigger, while merging/converting/uploading
+#   ok/err:      "My Scan Job [OK 14:32]" – after processing completes
 # Uses the HP EWS web form which works immediately after scanning (LEDM PUT is locked ~8 min post-scan).
 # Requires PRINTER_IP. If PRINTER_USER is set, only jobs whose name contains
 # that string are updated. All failures are silent.
@@ -97,6 +98,7 @@ printer_notify() {
                 -not -name "$MERGE_NAME" 2>/dev/null | wc -l | tr -d ' ')
             suffix="[scan ${count}]"
             ;;
+        processing) suffix="[proc...]"              ;;
         ok)  suffix="[OK $(date '+%H:%M')]"  ;;
         *)   suffix="[ERR $(date '+%H:%M')]" ;;
     esac
@@ -318,6 +320,7 @@ process_batch() {
 
     printer_notify "$first_filename" collecting
     wait_for_trigger
+    printer_notify "$first_filename" processing
 
     # Record the exact moment the trigger fired – used to separate this batch
     # from any new files that may arrive while processing is in progress.
