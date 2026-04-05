@@ -8,7 +8,7 @@ PRINTER_IP="${PRINTER_IP:-}"
 SW_PATTERN="${SW_PATTERN:-scan-bw}"
 MULTI_PATTERN="${MULTI_PATTERN:-multi}"
 ESCL_BW_DPI="${ESCL_BW_DPI:-600}"
-ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-300}"
+ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-600}"
 
 respond() {
     local code="$1" body="$2"

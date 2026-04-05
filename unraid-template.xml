@@ -41,7 +41,7 @@
 
   <!-- eSCL scan endpoints -->
   <Config Name="eSCL B&amp;W DPI" Target="ESCL_BW_DPI" Default="600" Mode="" Description="DPI for B&amp;W scans triggered via /scan/single/bw and /scan/multi/bw. Requires PRINTER_IP and eSCL enabled on the printer." Type="Variable" Display="advanced" Required="false" Mask="false">600</Config>
-  <Config Name="eSCL Color DPI" Target="ESCL_COLOR_DPI" Default="300" Mode="" Description="DPI for color scans triggered via /scan/single/color and /scan/multi/color. Requires PRINTER_IP and eSCL enabled on the printer." Type="Variable" Display="advanced" Required="false" Mask="false">300</Config>
+  <Config Name="eSCL Color DPI" Target="ESCL_COLOR_DPI" Default="600" Mode="" Description="DPI for color scans triggered via /scan/single/color and /scan/multi/color. Requires PRINTER_IP and eSCL enabled on the printer." Type="Variable" Display="advanced" Required="false" Mask="false">600</Config>
 
   <!-- Printer notifications -->
   <Config Name="Printer Notify" Target="PRINTER_NOTIFY" Default="false" Mode="" Description="Set to true to update the matching scan job's display name in the printer menu after each multi-page batch (e.g. &quot;My Scan Job [OK 14:32]&quot;). Requires PRINTER_IP." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>

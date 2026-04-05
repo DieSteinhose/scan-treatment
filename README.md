@@ -74,7 +74,7 @@ All settings are controlled via environment variables.
 | `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true` or using `/scan/*` endpoints) |
 | `PRINTER_USER` | – | Optional filter: only update jobs whose display name contains this string. Useful when multiple containers share one printer. |
 | `ESCL_BW_DPI` | `600` | DPI for B&W scans via `/scan/single/bw` and `/scan/multi/bw` |
-| `ESCL_COLOR_DPI` | `300` | DPI for color scans via `/scan/single/color` and `/scan/multi/color` |
+| `ESCL_COLOR_DPI` | `600` | DPI for color scans via `/scan/single/color` and `/scan/multi/color` |
 | `TZ` | `Europe/Berlin` | Timezone for log timestamps and output filenames (e.g. `Europe/London`, `America/New_York`) |
 
 ## HTTP endpoints

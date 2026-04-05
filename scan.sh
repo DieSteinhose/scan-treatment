@@ -26,7 +26,7 @@ PRINTER_NOTIFY="${PRINTER_NOTIFY:-false}"       # true = send scan-menu status u
 PRINTER_IP="${PRINTER_IP:-}"                    # Printer IP address (required when PRINTER_NOTIFY=true or using /scan/* endpoints)
 PRINTER_USER="${PRINTER_USER:-}"               # Filter: only update jobs whose name contains this string
 ESCL_BW_DPI="${ESCL_BW_DPI:-600}"             # DPI for eSCL B&W scans via /scan/* endpoints
-ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-300}"        # DPI for eSCL color scans via /scan/* endpoints
+ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-600}"        # DPI for eSCL color scans via /scan/* endpoints
 
 MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
