@@ -24,7 +24,6 @@ RUN apk add --no-cache \
     curl \
     socat \
     tzdata \
-    ncurses \
     htop \
     nano
 
