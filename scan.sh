@@ -137,13 +137,20 @@ check_file_size() {
 
 # ── PDF merge ──────────────────────────────────────────────────────────────────
 merge_pdfs() {
-    local dir="$1" output="$2"
+    local dir="$1" output="$2" ref="${3:-}"
     local pdf_files=()
 
-    # Collect all PDFs except the internal merge temp file, sorted naturally
+    # Collect all PDFs except the internal merge temp file, sorted naturally.
+    # If a reference file is given, only include files not newer than it.
     while IFS= read -r -d '' f; do
         [[ "$(basename "$f")" != "$MERGE_NAME" ]] && pdf_files+=("$f")
-    done < <(find "$dir" -maxdepth 1 -name "*.pdf" -print0 | sort -zV)
+    done < <(
+        if [[ -n "$ref" ]]; then
+            find "$dir" -maxdepth 1 -name "*.pdf" -not -newer "$ref" -print0 | sort -zV
+        else
+            find "$dir" -maxdepth 1 -name "*.pdf" -print0 | sort -zV
+        fi
+    )
 
     if [[ ${#pdf_files[@]} -eq 0 ]]; then
         log_err "No PDF files found to merge"
@@ -181,14 +188,18 @@ wait_for_trigger() {
 # ── Multi mode: collect pages, wait for trigger, then process ─────────────────
 process_batch() {
     local first_filename="$1"
-    local timestamp output_file merge_tmp
+    local timestamp output_file merge_tmp trigger_ref
 
     wait_for_trigger
 
+    # Record the exact moment the trigger fired – used to separate this batch
+    # from any new files that may arrive while processing is in progress.
+    trigger_ref=$(mktemp)
+
     # Bail out if the directory is now empty (e.g. after a restart)
-    if [[ -z "$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -not -name "$MERGE_NAME" 2>/dev/null)" ]]; then
+    if [[ -z "$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -not -name "$MERGE_NAME" -not -newer "$trigger_ref" 2>/dev/null)" ]]; then
         log_warn "Watch directory empty – nothing to process"
-        rm -f "$LOCK_FILE"
+        rm -f "$LOCK_FILE" "$trigger_ref"
         return 0
     fi
 
@@ -196,11 +207,11 @@ process_batch() {
     merge_tmp="${WATCH_DIR}${MERGE_NAME}"
     output_file="${EXPORT_DIR}${timestamp}${first_filename}"
 
-    if merge_pdfs "$WATCH_DIR" "$merge_tmp"; then
+    if merge_pdfs "$WATCH_DIR" "$merge_tmp" "$trigger_ref"; then
         # Use first_filename for B&W/color detection since the merge tmp has no meaningful name
         if process_pdf "$merge_tmp" "$output_file" "$first_filename"; then
-            # Clean up all source PDFs and the temp merge file
-            find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -delete
+            # Only delete files that were present at trigger time; newer files belong to the next batch
+            find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" -not -newer "$trigger_ref" -delete
             log_ok "Import directory cleaned up"
 
             if check_file_size "$output_file"; then
@@ -216,7 +227,7 @@ process_batch() {
         log_err "Merge failed"
     fi
 
-    rm -f "$LOCK_FILE"
+    rm -f "$LOCK_FILE" "$trigger_ref"
 }
 
 # ── Single mode: process each file immediately ─────────────────────────────────
