@@ -11,6 +11,9 @@ ENV FAIL_PAUSE=60 \
     PAPERLESS_URL= \
     PAPERLESS_TOKEN= \
     TG_NOTIFY_SUCCESS=false \
+    PRINTER_NOTIFY=false \
+    PRINTER_IP= \
+    PRINTER_USER= \
     TZ=Europe/Berlin
 
 RUN apk add --no-cache \

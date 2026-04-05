@@ -22,6 +22,9 @@ PAPERLESS_TOKEN="${PAPERLESS_TOKEN:-}"
 TG_API_KEY="${TG_API_KEY:-}"
 TG_CHAT_ID="${TG_CHAT_ID:-}"
 TG_NOTIFY_SUCCESS="${TG_NOTIFY_SUCCESS:-false}" # true = also notify on successful uploads
+PRINTER_NOTIFY="${PRINTER_NOTIFY:-false}"       # true = send scan-menu status updates to the printer (requires PRINTER_IP)
+PRINTER_IP="${PRINTER_IP:-}"                    # Printer IP address (required when PRINTER_NOTIFY=true)
+PRINTER_USER="${PRINTER_USER:-}"               # Filter: only update jobs whose name contains this string
 
 MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
@@ -39,6 +42,78 @@ log()      { echo -e "[$(date '+%H:%M:%S')] $*"; }
 log_ok()   { log "${green}$*${reset}"; }
 log_err()  { log "${red}ERROR: $*${reset}" >&2; }
 log_warn() { log "${yellow}WARN: $*${reset}"; }
+
+# ── Printer scan-menu notifications (optional, multi-mode only) ───────────────
+# The matching job's display name is updated at two points:
+#   collecting: "My Scan Job [scan... 2]"  – while waiting for the trigger button (count updates per page)
+#   ok/err:     "My Scan Job [OK 14:32]"  – after processing completes
+# Requires PRINTER_IP. If PRINTER_USER is set, only jobs whose name contains
+# that string are updated. All failures are silent.
+
+# Find the PredefinedJob ID whose FileNamePrefix best matches the given filename.
+# If PRINTER_USER is set, skips jobs whose display name does not contain it.
+_printer_find_job() {
+    local filename="$1"
+    [[ "$PRINTER_NOTIFY" != "true" ]] && return 1
+    local jobs_xml block prefix name uri best_len=0 best_id=""
+    jobs_xml=$(curl -sf --max-time 5 \
+        "http://${PRINTER_IP}/DevMgmt/Folder/PredefinedJobs" 2>/dev/null) || return 1
+    while IFS= read -r block; do
+        [[ -z "$block" ]] && continue
+        prefix=$(printf '%s' "$block" | \
+            grep -o '<dd:FileNamePrefix>[^<]*</dd:FileNamePrefix>' | sed 's|<[^>]*>||g')
+        name=$(printf '%s' "$block" | \
+            grep -o '<dd:Name>[^<]*</dd:Name>' | sed 's|<[^>]*>||g; s| \[.*\]||')
+        uri=$(printf '%s' "$block" | \
+            grep -o 'PredefinedJobs/[0-9]*</dd:ResourceURI>' | \
+            grep -o '[0-9]*')
+        # Skip if PRINTER_USER filter is active and job name doesn't match
+        [[ -n "$PRINTER_USER" && "$name" != *"$PRINTER_USER"* ]] && continue
+        if [[ -n "$prefix" && -n "$uri" && "$filename" == "${prefix}"* \
+              && ${#prefix} -gt $best_len ]]; then
+            best_len=${#prefix}
+            best_id="$uri"
+        fi
+    done < <(printf '%s' "$jobs_xml" | \
+        sed 's|</folder:PredefinedJob>|</folder:PredefinedJob>\n|g')
+    [[ -n "$best_id" ]] && { echo "$best_id"; return 0; }
+    return 1
+}
+
+# Update the display name of the matching multi-page scan job.
+# status: collecting (waiting for pages) | ok | err
+printer_notify() {
+    local filename="$1" status="$2"
+    [[ "$PRINTER_NOTIFY" != "true" ]] && return 0
+    local job_id
+    job_id=$(_printer_find_job "$filename") || return 0
+    local url="http://${PRINTER_IP}/DevMgmt/Folder/PredefinedJobs/${job_id}"
+    local xml
+    xml=$(curl -sf --max-time 5 "$url" 2>/dev/null) || return 0
+    # Strip any existing status suffix to get the clean base name
+    local base_name
+    base_name=$(printf '%s' "$xml" | \
+        grep -o '<dd:Name>[^<]*</dd:Name>' | sed 's|<[^>]*>||g; s| \[.*\]||')
+    local suffix
+    case "$status" in
+        collecting)
+            local count
+            count=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
+                -not -name "$MERGE_NAME" 2>/dev/null | wc -l | tr -d ' ')
+            suffix="[scan... ${count}]"
+            ;;
+        ok)         suffix="[OK $(date '+%H:%M')]" ;;
+        *)          suffix="[ERR $(date '+%H:%M')]" ;;
+    esac
+    local escaped
+    escaped=$(printf '%s %s' "$base_name" "$suffix" | sed 's/[&\]/\\&/g; s|/|\\/|g')
+    local updated
+    updated=$(printf '%s' "$xml" | \
+        sed "s|<dd:Name>[^<]*</dd:Name>|<dd:Name>${escaped}</dd:Name>|")
+    curl -sf --max-time 5 -X PUT -H "Content-Type: text/xml; charset=utf-8" \
+        -d "$updated" "$url" > /dev/null 2>&1 || true
+    log "Printer: job ${job_id} → '${base_name} ${suffix}'"
+}
 
 # ── Telegram notifications (optional) ─────────────────────────────────────────
 tg_send() {
@@ -202,6 +277,7 @@ process_batch() {
     local first_filename="$1"
     local timestamp output_file merge_tmp trigger_ref
 
+    printer_notify "$first_filename" collecting
     wait_for_trigger
 
     # Record the exact moment the trigger fired – used to separate this batch
@@ -230,12 +306,15 @@ process_batch() {
 
             if check_file_size "$output_file"; then
                 upload_to_paperless_with_retry "$output_file"
+                printer_notify "$first_filename" ok
             else
                 log_err "Skipping upload due to failed size check: $output_file"
+                printer_notify "$first_filename" err
             fi
         else
             log_err "PDF processing failed"
             rm -f "$merge_tmp"
+            printer_notify "$first_filename" err
         fi
     else
         log_err "Merge failed"
@@ -338,6 +417,13 @@ main() {
     [[ -n "$TG_API_KEY" ]] \
         && log "Telegram:  enabled" \
         || log "Telegram:  disabled"
+    if [[ "$PRINTER_NOTIFY" == "true" ]]; then
+        local printer_info="${PRINTER_IP:-?}"
+        [[ -n "$PRINTER_USER" ]] && printer_info+=" (user: $PRINTER_USER)"
+        log "Printer:   $printer_info"
+    else
+        log "Printer:   disabled (PRINTER_NOTIFY=false)"
+    fi
     log "============================================="
 
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
@@ -400,6 +486,7 @@ main() {
                     local seen_lock="/tmp/scan_seen_${FILENAME}.lock"
                     if mkdir "$seen_lock" 2>/dev/null; then
                         log "Batch in progress – '$FILENAME' added to current stack"
+                        printer_notify "$FILENAME" collecting
                     fi
                 else
                     touch "$LOCK_FILE"

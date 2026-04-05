@@ -70,6 +70,9 @@ All settings are controlled via environment variables.
 | `TG_API_KEY` | – | Telegram bot token (optional) |
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 | `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
+| `PRINTER_NOTIFY` | `false` | `true` = update the matching scan job's display name in the printer menu after each multi-page batch |
+| `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true`) |
+| `PRINTER_USER` | – | Optional filter: only update jobs whose display name contains this string. Useful when multiple containers share one printer. |
 | `TZ` | `Europe/Berlin` | Timezone for log timestamps and output filenames (e.g. `Europe/London`, `America/New_York`) |
 
 ## Trigger endpoint
@@ -149,6 +152,9 @@ services:
       # TG_API_KEY: "123456:ABC..."     # optional: Telegram bot token
       # TG_CHAT_ID: "123456789"         # optional: Telegram chat ID
       # TG_NOTIFY_SUCCESS: "false"      # optional: notify on successful uploads
+      # PRINTER_NOTIFY: "true"          # optional: update printer scan-menu on batch completion
+      # PRINTER_IP: "192.168.1.x"       # optional: printer IP (required when PRINTER_NOTIFY=true)
+      # PRINTER_USER: "Alice"            # optional: filter to only update jobs with this name
 ```
 
 ## Unraid
@@ -182,3 +188,4 @@ docker build -t scan-treatment .
 - Failed Paperless uploads are retried indefinitely every `FAIL_PAUSE` seconds.
 - Telegram notifications are fully optional. Nothing is sent if `TG_API_KEY` is unset.
 - In multi mode, only one batch runs at a time. Files arriving during an active batch are automatically added to the current stack.
+- Printer notifications (`PRINTER_NOTIFY=true`) work only in multi mode. When the first page of a batch arrives, the matching scan job's name in the printer's scan menu changes to e.g. `My Scan Job [scan... 2]`. After processing it updates to `[OK 14:32]` or `[ERR 14:32]`. Tested with HP LaserJet MFP M130fw via the LEDM Folder API.

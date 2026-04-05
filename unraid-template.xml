@@ -37,6 +37,13 @@
   <!-- Telegram -->
   <Config Name="Telegram Bot Token" Target="TG_API_KEY" Default="" Mode="" Description="Optional Telegram bot token for notifications (e.g. successful upload, errors)." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Telegram Chat ID" Target="TG_CHAT_ID" Default="" Mode="" Description="Optional Telegram chat ID for notifications." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
-  <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Timezone for log timestamps and output filenames (e.g. Europe/London, America/New_York)." Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Berlin</Config>
   <Config Name="Telegram Notify on Success" Target="TG_NOTIFY_SUCCESS" Default="false" Mode="" Description="Set to true to also send a Telegram notification on successful uploads. By default only errors are reported." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+
+  <!-- Printer notifications -->
+  <Config Name="Printer Notify" Target="PRINTER_NOTIFY" Default="false" Mode="" Description="Set to true to update the matching scan job's display name in the printer menu after each multi-page batch (e.g. &quot;My Scan Job [OK 14:32]&quot;). Requires PRINTER_IP." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="Printer IP" Target="PRINTER_IP" Default="" Mode="" Description="IP address of the printer (required when PRINTER_NOTIFY=true). Tested with HP LaserJet MFP M130fw." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Printer User Filter" Target="PRINTER_USER" Default="" Mode="" Description="Optional: only update scan jobs whose display name contains this string. Useful when multiple containers share one printer." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+
+  <!-- Timezone -->
+  <Config Name="Timezone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Timezone for log timestamps and output filenames (e.g. Europe/London, America/New_York)." Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Berlin</Config>
 </Container>
