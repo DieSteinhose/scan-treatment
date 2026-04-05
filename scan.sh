@@ -110,9 +110,15 @@ printer_notify() {
     local updated
     updated=$(printf '%s' "$xml" | \
         sed "s|<dd:Name>[^<]*</dd:Name>|<dd:Name>${escaped}</dd:Name>|")
-    curl -sf --max-time 5 -X PUT -H "Content-Type: text/xml; charset=utf-8" \
-        -d "$updated" "$url" > /dev/null 2>&1 || true
-    log "Printer: job ${job_id} → '${base_name} ${suffix}'"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+        -X PUT -H "Content-Type: text/xml; charset=utf-8" \
+        -d "$updated" "$url" 2>/dev/null) || true
+    if [[ "$http_code" =~ ^2 ]]; then
+        log "Printer: job ${job_id} → '${base_name} ${suffix}'"
+    else
+        log_warn "Printer: job ${job_id} PUT failed (HTTP ${http_code:-timeout})"
+    fi
 }
 
 # ── Telegram notifications (optional) ─────────────────────────────────────────
