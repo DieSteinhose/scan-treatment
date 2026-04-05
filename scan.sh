@@ -291,6 +291,9 @@ main() {
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
     rm -f "$LOCK_FILE" "$TRIGGER_FILE"
 
+    # Start HTTP server first so the trigger endpoint is ready before any batch processing
+    start_http_server
+
     # Re-upload any leftover files in export dir from a previous run
     local leftover
     leftover=$(find "$EXPORT_DIR" -maxdepth 1 -name "*.pdf" 2>/dev/null)
@@ -313,6 +316,11 @@ main() {
                 if [[ ! -f "$LOCK_FILE" ]]; then
                     touch "$LOCK_FILE"
                     log "New batch started by: $filename"
+                    local file_age=$(( $(date +%s) - $(stat -c %Y "$file") ))
+                    if [[ $file_age -ge $BUTTON_PAUSE ]]; then
+                        log_warn "File is ${file_age}s old (>= ${BUTTON_PAUSE}s) – triggering immediately"
+                        touch "$TRIGGER_FILE"
+                    fi
                     process_batch "$filename" &
                 else
                     log "Batch in progress – '$filename' added to current stack"
@@ -322,8 +330,6 @@ main() {
             fi
         done <<< "$pending"
     fi
-
-    start_http_server
 
     while true; do
         log "Watching $WATCH_DIR for new scans..."
