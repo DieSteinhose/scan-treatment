@@ -8,11 +8,13 @@ on:
       - "v*"
     paths-ignore:
       - "**.md"
+      - "unraid-template.xml"
   pull_request:
     branches:
       - main
     paths-ignore:
       - "**.md"
+      - "unraid-template.xml"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
