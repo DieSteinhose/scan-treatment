@@ -35,7 +35,7 @@ yellow='\033[0;33m'
 reset='\033[0m'
 
 # ── Logging ────────────────────────────────────────────────────────────────────
-log()      { echo "[$(date '+%H:%M:%S')] $*"; }
+log()      { echo -e "[$(date '+%H:%M:%S')] $*"; }
 log_ok()   { log "${green}$*${reset}"; }
 log_err()  { log "${red}ERROR: $*${reset}" >&2; }
 log_warn() { log "${yellow}WARN: $*${reset}"; }
