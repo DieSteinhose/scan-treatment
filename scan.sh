@@ -44,11 +44,12 @@ log_err()  { log "${red}ERROR: $*${reset}" >&2; }
 log_warn() { log "${yellow}WARN: $*${reset}"; }
 
 # ── Printer scan-menu notifications (optional, multi-mode only) ───────────────
-# The matching job's display name is updated at three points:
-#   collecting:  "My Scan Job [scan 2]"   – while waiting for the trigger button (count updates per page)
+# The scan job's display name reflects the current state:
+#   collecting:  "My Scan Job [scan 2]"   – while waiting for the trigger (count updates per page)
 #   processing:  "My Scan Job [proc...]"  – after trigger, while merging/converting/uploading
 #   ok/err:      "My Scan Job [OK 14:32]" – after processing completes
-# Uses the HP EWS web form which works immediately after scanning (LEDM PUT is locked ~8 min post-scan).
+# Status suffixes are cleared after 60 minutes and on container start.
+# Uses the HP EWS web form (works immediately after scanning; LEDM PUT is locked ~8 min post-scan).
 # Requires PRINTER_IP. If PRINTER_USER is set, only jobs whose name contains
 # that string are updated. All failures are silent.
 
@@ -82,58 +83,22 @@ _printer_find_job() {
     return 1
 }
 
-# Update the display name of the matching multi-page scan job via EWS web form.
-# status: collecting (waiting for pages) | ok | err
-printer_notify() {
-    local filename="$1" status="$2"
-    [[ "$PRINTER_NOTIFY" != "true" ]] && return 0
-    local job_id
-    job_id=$(_printer_find_job "$filename") || return 0
-
-    local suffix
-    case "$status" in
-        collecting)
-            local count
-            count=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
-                -not -name "$MERGE_NAME" 2>/dev/null | wc -l | tr -d ' ')
-            suffix="[scan ${count}]"
-            ;;
-        processing) suffix="[proc...]"              ;;
-        ok)  suffix="[OK $(date '+%H:%M')]"  ;;
-        *)   suffix="[ERR $(date '+%H:%M')]" ;;
-    esac
-
-    # Fetch current EWS job configuration form
-    local html
-    html=$(curl -sf --max-time 10 \
-        "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html?tab=Scan&menu=ScantoCfg&entryNum=${job_id}" \
-        2>/dev/null) || return 0
-
-    # Extract current base name and strip any existing status suffix
-    local base_name
-    base_name=$(printf '%s' "$html" | grep -i 'name="displayName"' | \
-        grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//; s/ \[.*\]//')
-
-    # Build new name truncated to fit within printer's 25-char limit
-    local max_base=$(( 25 - 1 - ${#suffix} ))
-    local new_name="${base_name:0:$max_base} ${suffix}"
-
-    # Collect all INPUT field values for the form POST
+# Submit the EWS form for a job with a new displayName.
+# Takes pre-fetched form HTML so the caller only needs one HTTP fetch.
+_printer_ews_post() {
+    local html="$1" new_name="$2"
     local -a curl_args=()
     while IFS= read -r tag; do
         local name type value
         name=$(printf '%s' "$tag" | grep -oi 'name="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         type=$(printf '%s' "$tag" | grep -oi 'type="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         [[ -z "$name" ]] && continue
-        # Skip all submit buttons except Save_button
         [[ "${type,,}" == "submit" && "$name" != "Save_button" ]] && continue
         [[ "${type,,}" == "button" || "${type,,}" == "image" ]] && continue
         value=$(printf '%s' "$tag" | grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         [[ "$name" == "displayName" ]] && value="$new_name"
         curl_args+=("--data-urlencode" "${name}=${value}")
     done < <(printf '%s' "$html" | grep -i '<INPUT')
-
-    # Add SELECTED values from SELECT elements
     for sel_name in fileType DefaultPaperSize ScanQualitySelection scanColorSelection; do
         local sel_value
         sel_value=$(printf '%s' "$html" | \
@@ -142,18 +107,90 @@ printer_notify() {
             grep -oi 'value="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         [[ -n "$sel_value" ]] && curl_args+=("--data-urlencode" "${sel_name}=${sel_value}")
     done
-
-    # POST to EWS; printer returns 303 redirect on both success and failure
     local http_code
     http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
         "${curl_args[@]}" \
         "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html/config" 2>/dev/null) || true
+    [[ "$http_code" == "303" || "$http_code" =~ ^2 ]]
+}
 
-    if [[ "$http_code" == "303" || "$http_code" =~ ^2 ]]; then
+# Update the display name of the matching multi-page scan job.
+# status: collecting | processing | ok | err | reset
+printer_notify() {
+    local filename="$1" status="$2"
+    [[ "$PRINTER_NOTIFY" != "true" ]] && return 0
+    local job_id
+    job_id=$(_printer_find_job "$filename") || return 0
+
+    # Fetch current EWS job configuration form (single fetch, reused below)
+    local html
+    html=$(curl -sf --max-time 10 \
+        "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html?tab=Scan&menu=ScantoCfg&entryNum=${job_id}" \
+        2>/dev/null) || return 0
+
+    # Extract current display name and base name (without any suffix)
+    local current_name base_name
+    current_name=$(printf '%s' "$html" | grep -i 'name="displayName"' | \
+        grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
+    base_name=$(printf '%s' "$current_name" | sed 's/ \[.*\]//')
+
+    local suffix new_name
+    case "$status" in
+        collecting)
+            local count
+            count=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
+                -not -name "$MERGE_NAME" 2>/dev/null | wc -l | tr -d ' ')
+            suffix="[scan ${count}]"
+            ;;
+        processing) suffix="[proc...]"              ;;
+        ok)         suffix="[OK $(date '+%H:%M')]"  ;;
+        reset)
+            # Skip if another batch is already active – don't overwrite [scan N] or [proc...]
+            printf '%s' "$current_name" | grep -qE '\[(OK|ERR) [0-9]{2}:[0-9]{2}\]' || return 0
+            new_name="$base_name"
+            ;;
+        *)          suffix="[ERR $(date '+%H:%M')]" ;;
+    esac
+
+    # Build new_name from suffix (reset sets new_name directly above)
+    if [[ -z "${new_name:-}" ]]; then
+        local max_base=$(( 25 - 1 - ${#suffix} ))
+        new_name="${base_name:0:$max_base} ${suffix}"
+    fi
+
+    if _printer_ews_post "$html" "$new_name"; then
         log "Printer: job ${job_id} → '${new_name}'"
     else
-        log_warn "Printer: job ${job_id} EWS POST failed (HTTP ${http_code:-timeout})"
+        log_warn "Printer: job ${job_id} EWS POST failed"
     fi
+}
+
+# Reset all scan job names that still carry a status suffix (called on container start).
+printer_reset_all() {
+    [[ "$PRINTER_NOTIFY" != "true" ]] && return 0
+    local jobs_xml block name uri
+    jobs_xml=$(curl -sf --max-time 5 \
+        "http://${PRINTER_IP}/DevMgmt/Folder/PredefinedJobs" 2>/dev/null) || return 0
+    while IFS= read -r block; do
+        [[ -z "$block" ]] && continue
+        name=$(printf '%s' "$block" | \
+            grep -o '<dd:Name>[^<]*</dd:Name>' | sed 's|<[^>]*>||g')
+        uri=$(printf '%s' "$block" | \
+            grep -o 'PredefinedJobs/[0-9]*</dd:ResourceURI>' | grep -o '[0-9]*')
+        [[ -z "$uri" || -z "$name" ]] && continue
+        [[ -n "$PRINTER_USER" && "$name" != *"$PRINTER_USER"* ]] && continue
+        # Skip jobs without a status suffix
+        printf '%s' "$name" | grep -q ' \[' || continue
+        local base_name html
+        base_name=$(printf '%s' "$name" | sed 's/ \[.*\]//')
+        html=$(curl -sf --max-time 10 \
+            "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html?tab=Scan&menu=ScantoCfg&entryNum=${uri}" \
+            2>/dev/null) || continue
+        if _printer_ews_post "$html" "$base_name"; then
+            log "Printer: job ${uri} reset → '${base_name}'"
+        fi
+    done < <(printf '%s' "$jobs_xml" | \
+        sed 's|</folder:PredefinedJob>|</folder:PredefinedJob>\n|g')
 }
 
 # ── Telegram notifications (optional) ─────────────────────────────────────────
@@ -349,14 +386,17 @@ process_batch() {
             if check_file_size "$output_file"; then
                 upload_to_paperless_with_retry "$output_file"
                 printer_notify "$first_filename" ok
+                ( sleep 3600; printer_notify "$first_filename" reset ) &
             else
                 log_err "Skipping upload due to failed size check: $output_file"
                 printer_notify "$first_filename" err
+                ( sleep 3600; printer_notify "$first_filename" reset ) &
             fi
         else
             log_err "PDF processing failed"
             rm -f "$merge_tmp"
             printer_notify "$first_filename" err
+            ( sleep 3600; printer_notify "$first_filename" reset ) &
         fi
     else
         log_err "Merge failed"
@@ -473,6 +513,9 @@ main() {
 
     # Start HTTP server first so the trigger endpoint is ready before any batch processing
     start_http_server
+
+    # Clear any status suffixes left over from a previous container run
+    printer_reset_all
 
     # Re-upload any leftover files in export dir from a previous run
     local leftover
