@@ -312,6 +312,7 @@ cleanup() {
     [[ -n "$HTTP_PID" ]] && kill "$HTTP_PID" 2>/dev/null || true
     pkill -P $$ inotifywait 2>/dev/null || pkill inotifywait 2>/dev/null || true
     jobs -p | xargs -r kill 2>/dev/null || true
+    exit 0
 }
 
 # ── Entry point ────────────────────────────────────────────────────────────────
