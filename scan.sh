@@ -30,6 +30,7 @@ MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
 LOCK_FILE="/tmp/scan_processing.lock"
 TRIGGERED_FILE="/tmp/scan_triggered"
+CHAINED_FILE="/tmp/scan_chained"
 HTTP_PID=""
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
@@ -145,7 +146,11 @@ printer_notify() {
             local count
             count=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
                 -not -name "$MERGE_NAME" 2>/dev/null | wc -l | tr -d ' ')
-            suffix="[scan ${count}]"
+            if [[ -f "$CHAINED_FILE" ]]; then
+                suffix="[OK scan ${count}]"
+            else
+                suffix="[scan ${count}]"
+            fi
             ;;
         processing) suffix="[proc...]"              ;;
         ok)         suffix="[OK $(date '+%H:%M')]"  ;;
@@ -363,6 +368,7 @@ process_batch() {
 
     printer_notify "$first_filename" collecting
     wait_for_trigger
+    rm -f "$CHAINED_FILE"
     touch "$TRIGGERED_FILE"
     printer_notify "$first_filename" processing
 
@@ -392,8 +398,17 @@ process_batch() {
 
             if check_file_size "$output_file"; then
                 upload_to_paperless_with_retry "$output_file"
-                printer_notify "$first_filename" ok
-                ( sleep 3600; printer_notify "$first_filename" reset ) &
+                # If files arrived during processing, show [OK scan N] instead of [OK HH:MM]
+                local queued
+                queued=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
+                    -not -name "$MERGE_NAME" -newer "$trigger_ref" 2>/dev/null | head -1)
+                if [[ -n "$queued" ]]; then
+                    touch "$CHAINED_FILE"
+                    printer_notify "$first_filename" collecting
+                else
+                    printer_notify "$first_filename" ok
+                    ( sleep 3600; printer_notify "$first_filename" reset ) &
+                fi
             else
                 log_err "Skipping upload due to failed size check: $output_file"
                 printer_notify "$first_filename" err
@@ -476,7 +491,7 @@ start_http_server() {
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
 cleanup() {
     log "Shutting down..."
-    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE"
+    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE" "$CHAINED_FILE"
     [[ -n "$HTTP_PID" ]] && kill "$HTTP_PID" 2>/dev/null || true
     pkill -P $$ inotifywait 2>/dev/null || pkill inotifywait 2>/dev/null || true
     jobs -p | xargs -r kill 2>/dev/null || true
@@ -516,7 +531,7 @@ main() {
     log "============================================="
 
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
-    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE"
+    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE" "$CHAINED_FILE"
 
     # Start HTTP server first so the trigger endpoint is ready before any batch processing
     start_http_server
