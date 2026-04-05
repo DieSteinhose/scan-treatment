@@ -10,7 +10,8 @@ ENV FAIL_PAUSE=60 \
     MULTI_PATTERN=multi \
     PAPERLESS_URL= \
     PAPERLESS_TOKEN= \
-    TG_NOTIFY_SUCCESS=false
+    TG_NOTIFY_SUCCESS=false \
+    TZ=Europe/Berlin
 
 RUN apk add --no-cache \
     bash \
@@ -22,6 +23,7 @@ RUN apk add --no-cache \
     inotify-tools \
     curl \
     socat \
+    tzdata \
     ncurses \
     htop \
     nano

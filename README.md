@@ -53,6 +53,7 @@ All settings are controlled via environment variables.
 | `TG_API_KEY` | – | Telegram bot token (optional) |
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 | `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
+| `TZ` | `Europe/Berlin` | Timezone for log timestamps and output filenames (e.g. `Europe/London`, `America/New_York`) |
 
 ## Home Assistant integration
 
