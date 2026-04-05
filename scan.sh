@@ -29,6 +29,7 @@ PRINTER_USER="${PRINTER_USER:-}"               # Filter: only update jobs whose 
 MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
 LOCK_FILE="/tmp/scan_processing.lock"
+TRIGGERED_FILE="/tmp/scan_triggered"
 HTTP_PID=""
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
@@ -362,6 +363,7 @@ process_batch() {
 
     printer_notify "$first_filename" collecting
     wait_for_trigger
+    touch "$TRIGGERED_FILE"
     printer_notify "$first_filename" processing
 
     # Record the exact moment the trigger fired – used to separate this batch
@@ -407,7 +409,7 @@ process_batch() {
         log_err "Merge failed"
     fi
 
-    rm -f "$LOCK_FILE" "$trigger_ref"
+    rm -f "$LOCK_FILE" "$TRIGGERED_FILE" "$trigger_ref"
     # Clear seen-locks so the same filenames can be logged again in the next batch
     rm -rf /tmp/scan_seen_*.lock
 
@@ -474,7 +476,7 @@ start_http_server() {
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
 cleanup() {
     log "Shutting down..."
-    rm -f "$LOCK_FILE" "$TRIGGER_FILE"
+    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE"
     [[ -n "$HTTP_PID" ]] && kill "$HTTP_PID" 2>/dev/null || true
     pkill -P $$ inotifywait 2>/dev/null || pkill inotifywait 2>/dev/null || true
     jobs -p | xargs -r kill 2>/dev/null || true
@@ -514,7 +516,7 @@ main() {
     log "============================================="
 
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
-    rm -f "$LOCK_FILE" "$TRIGGER_FILE"
+    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE"
 
     # Start HTTP server first so the trigger endpoint is ready before any batch processing
     start_http_server
@@ -576,7 +578,8 @@ main() {
                     local seen_lock="/tmp/scan_seen_${FILENAME}.lock"
                     if mkdir "$seen_lock" 2>/dev/null; then
                         log "Batch in progress – '$FILENAME' added to current stack"
-                        printer_notify "$FILENAME" collecting
+                        # Only update count while still collecting; skip if trigger already fired
+                        [[ ! -f "$TRIGGERED_FILE" ]] && printer_notify "$FILENAME" collecting
                     fi
                 else
                     touch "$LOCK_FILE"
