@@ -87,18 +87,21 @@ _printer_find_job() {
 # Takes pre-fetched form HTML so the caller only needs one HTTP fetch.
 _printer_ews_post() {
     local html="$1" new_name="$2"
+    # Collect all INPUT field values for the form POST
     local -a curl_args=()
     while IFS= read -r tag; do
         local name type value
         name=$(printf '%s' "$tag" | grep -oi 'name="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         type=$(printf '%s' "$tag" | grep -oi 'type="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         [[ -z "$name" ]] && continue
+        # Skip all submit buttons except Save_button
         [[ "${type,,}" == "submit" && "$name" != "Save_button" ]] && continue
         [[ "${type,,}" == "button" || "${type,,}" == "image" ]] && continue
         value=$(printf '%s' "$tag" | grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         [[ "$name" == "displayName" ]] && value="$new_name"
         curl_args+=("--data-urlencode" "${name}=${value}")
     done < <(printf '%s' "$html" | grep -i '<INPUT')
+    # Add SELECTED values from SELECT elements
     for sel_name in fileType DefaultPaperSize ScanQualitySelection scanColorSelection; do
         local sel_value
         sel_value=$(printf '%s' "$html" | \
@@ -107,6 +110,7 @@ _printer_ews_post() {
             grep -oi 'value="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
         [[ -n "$sel_value" ]] && curl_args+=("--data-urlencode" "${sel_name}=${sel_value}")
     done
+    # POST to EWS; printer returns 303 redirect on both success and failure
     local http_code
     http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
         "${curl_args[@]}" \
@@ -114,7 +118,7 @@ _printer_ews_post() {
     [[ "$http_code" == "303" || "$http_code" =~ ^2 ]]
 }
 
-# Update the display name of the matching multi-page scan job.
+# Update the display name of the matching multi-page scan job via EWS web form.
 # status: collecting | processing | ok | err | reset
 printer_notify() {
     local filename="$1" status="$2"
@@ -122,13 +126,13 @@ printer_notify() {
     local job_id
     job_id=$(_printer_find_job "$filename") || return 0
 
-    # Fetch current EWS job configuration form (single fetch, reused below)
+    # Fetch current EWS job configuration form (single fetch, passed to _printer_ews_post)
     local html
     html=$(curl -sf --max-time 10 \
         "http://${PRINTER_IP}/hp/device/set_config_folderAddNew.html?tab=Scan&menu=ScantoCfg&entryNum=${job_id}" \
         2>/dev/null) || return 0
 
-    # Extract current display name and base name (without any suffix)
+    # Extract current display name and base name (without any existing status suffix)
     local current_name base_name
     current_name=$(printf '%s' "$html" | grep -i 'name="displayName"' | \
         grep -oi 'VALUE="[^"]*"' | head -1 | sed 's/^[^"]*"//; s/"$//')
@@ -152,7 +156,8 @@ printer_notify() {
         *)          suffix="[ERR $(date '+%H:%M')]" ;;
     esac
 
-    # Build new_name from suffix (reset sets new_name directly above)
+    # Build new_name from suffix, truncated to fit within printer's 25-char limit
+    # (reset sets new_name directly above, skipping this block)
     if [[ -z "${new_name:-}" ]]; then
         local max_base=$(( 25 - 1 - ${#suffix} ))
         new_name="${base_name:0:$max_base} ${suffix}"
