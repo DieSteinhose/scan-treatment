@@ -70,31 +70,38 @@ All settings are controlled via environment variables.
 | `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
 | `TZ` | `Europe/Berlin` | Timezone for log timestamps and output filenames (e.g. `Europe/London`, `America/New_York`) |
 
-## Home Assistant integration
+## Trigger endpoint
 
 > **Only required in multi mode (`DISABLE_MULTI=false`).** If your printer produces multi-page PDFs natively, set `DISABLE_MULTI=true` and skip this section entirely.
 
-The container exposes a lightweight HTTP server. A `GET` or `POST` to `/trigger` fires the multi-mode processing.
+Once all pages are scanned, the processing is started by calling the `/trigger` endpoint. This can be done by anything that can make an HTTP request – a Home Assistant button, a browser bookmark, a curl command, or any other tool.
 
-**`configuration.yaml`**
-```yaml
-rest_command:
-  scan_trigger:
-    url: http://192.168.1.x:8080/trigger
-    method: POST
-```
-
-**Automation / button action**
-```yaml
-action: rest_command.scan_trigger
+```bash
+# trigger manually
+curl http://<host>:8080/trigger
 ```
 
 Available endpoints:
 
 | Path | Description |
 |---|---|
-| `/trigger` | Fire processing (GET or POST) |
+| `/trigger` | Start processing (GET or POST) |
 | `/health` | Health check, returns `200 OK` |
+
+**Example: Home Assistant button**
+
+```yaml
+# configuration.yaml
+rest_command:
+  scan_trigger:
+    url: http://192.168.1.x:8080/trigger
+    method: POST
+```
+
+```yaml
+# automation / button action
+action: rest_command.scan_trigger
+```
 
 ## Filename convention
 
