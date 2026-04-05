@@ -23,8 +23,10 @@ TG_API_KEY="${TG_API_KEY:-}"
 TG_CHAT_ID="${TG_CHAT_ID:-}"
 TG_NOTIFY_SUCCESS="${TG_NOTIFY_SUCCESS:-false}" # true = also notify on successful uploads
 PRINTER_NOTIFY="${PRINTER_NOTIFY:-false}"       # true = send scan-menu status updates to the printer (requires PRINTER_IP)
-PRINTER_IP="${PRINTER_IP:-}"                    # Printer IP address (required when PRINTER_NOTIFY=true)
+PRINTER_IP="${PRINTER_IP:-}"                    # Printer IP address (required when PRINTER_NOTIFY=true or using /scan/* endpoints)
 PRINTER_USER="${PRINTER_USER:-}"               # Filter: only update jobs whose name contains this string
+ESCL_BW_DPI="${ESCL_BW_DPI:-600}"             # DPI for eSCL B&W scans via /scan/* endpoints
+ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-300}"        # DPI for eSCL color scans via /scan/* endpoints
 
 MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
@@ -527,6 +529,11 @@ main() {
         log "Printer:   $printer_info"
     else
         log "Printer:   disabled (PRINTER_NOTIFY=false)"
+    fi
+    if [[ -n "$PRINTER_IP" ]]; then
+        log "eSCL:      ${PRINTER_IP}  BW=${ESCL_BW_DPI}dpi  color=${ESCL_COLOR_DPI}dpi"
+    else
+        log "eSCL:      disabled (PRINTER_IP not set)"
     fi
     log "============================================="
 

@@ -71,8 +71,10 @@ All settings are controlled via environment variables.
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 | `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
 | `PRINTER_NOTIFY` | `false` | `true` = update the matching scan job's display name in the printer menu after each multi-page batch |
-| `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true`) |
+| `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true` or using `/scan/*` endpoints) |
 | `PRINTER_USER` | – | Optional filter: only update jobs whose display name contains this string. Useful when multiple containers share one printer. |
+| `ESCL_BW_DPI` | `600` | DPI for B&W scans via `/scan/single/bw` and `/scan/multi/bw` |
+| `ESCL_COLOR_DPI` | `300` | DPI for color scans via `/scan/single/color` and `/scan/multi/color` |
 | `TZ` | `Europe/Berlin` | Timezone for log timestamps and output filenames (e.g. `Europe/London`, `America/New_York`) |
 
 ## HTTP endpoints

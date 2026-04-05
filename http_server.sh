@@ -5,9 +5,10 @@
 
 WATCH_DIR="${WATCH_DIR:-/data/import/}"
 PRINTER_IP="${PRINTER_IP:-}"
-BW_DPI="${BW_DPI:-300}"
 SW_PATTERN="${SW_PATTERN:-scan-bw}"
 MULTI_PATTERN="${MULTI_PATTERN:-multi}"
+ESCL_BW_DPI="${ESCL_BW_DPI:-600}"
+ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-300}"
 
 respond() {
     local code="$1" body="$2"
@@ -108,14 +109,14 @@ case "${path%%\?*}" in
     # ── eSCL single-page endpoints ─────────────────────────────────────────────
     /scan/single/bw|/scan/single/bw/)
         filename="${SW_PATTERN}-$(date +%s).pdf"
-        if escl_scan "Grayscale8" "$BW_DPI" "$filename"; then
+        if escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename"; then
             respond "200 OK" "Scan started: ${filename}"
         fi
         ;;
 
     /scan/single/color|/scan/single/color/)
         filename="scan-color-$(date +%s).pdf"
-        if escl_scan "RGB24" "300" "$filename"; then
+        if escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename"; then
             respond "200 OK" "Scan started: ${filename}"
         fi
         ;;
@@ -123,14 +124,14 @@ case "${path%%\?*}" in
     # ── eSCL multi-page endpoints ──────────────────────────────────────────────
     /scan/multi/bw|/scan/multi/bw/)
         filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
-        if escl_scan "Grayscale8" "$BW_DPI" "$filename"; then
+        if escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename"; then
             respond "200 OK" "Page added: ${filename}"
         fi
         ;;
 
     /scan/multi/color|/scan/multi/color/)
         filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
-        if escl_scan "RGB24" "300" "$filename"; then
+        if escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename"; then
             respond "200 OK" "Page added: ${filename}"
         fi
         ;;
