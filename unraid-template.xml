@@ -27,7 +27,7 @@
   <Config Name="Disable Multi Mode" Target="DISABLE_MULTI" Default="false" Mode="" Description="Set to true if your printer natively produces multi-page PDFs. Every file will be processed immediately, MULTI_PATTERN is ignored." Type="Variable" Display="always" Required="false" Mask="false">false</Config>
 
   <!-- Processing parameters -->
-  <Config Name="B&amp;W Density (DPI)" Target="BW_DENSITY" Default="" Mode="" Description="DPI density for ImageMagick B&amp;W processing. Leave empty to use the image default. See README for current default value." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="B&amp;W Density (DPI)" Target="BW_DPI" Default="" Mode="" Description="DPI density for ImageMagick B&amp;W processing. Leave empty to use the image default. See README for current default value." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="B&amp;W Processing Parameters" Target="BW_PARAMS" Default="" Mode="" Description="ImageMagick parameters for B&amp;W processing. Leave empty to use the image default. See README for current default value." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="Color Processing Parameters" Target="COLOR_PARAMS" Default="" Mode="" Description="Ghostscript parameters for color processing. Leave empty to use the image default. See README for current default value." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
 

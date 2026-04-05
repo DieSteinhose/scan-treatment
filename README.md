@@ -6,16 +6,16 @@ Docker container for automatic scanner PDF processing. Optimizes black & white a
 
 The container watches an input directory using `inotifywait`. When the scanner drops a file, it is processed immediately (single mode) or collected with other pages and processed after a trigger (multi mode).
 
-**Black & white** (`scan-bw*.pdf`): ImageMagick – deskew, normalize, posterize, LZW compression at `BW_DENSITY` DPI (default: 300)  
+**Black & white** (`scan-bw*.pdf`): ImageMagick – deskew, normalize, posterize, LZW compression at `BW_DPI` DPI (default: 300)  
 **Color** (everything else): Ghostscript – bicubic downsampling to 300 DPI, `/ebook` preset
 
-> Processing settings are optimized for the **HP LaserJet MFP M130fw** at a scan resolution of **600 DPI**. Both pipelines are fully configurable via `BW_DENSITY`, `BW_PARAMS` and `COLOR_PARAMS` without rebuilding the image.
+> Processing settings are optimized for the **HP LaserJet MFP M130fw** at a scan resolution of **600 DPI**. Both pipelines are fully configurable via `BW_DPI`, `BW_PARAMS` and `COLOR_PARAMS` without rebuilding the image.
 
 **Default `BW_PARAMS`** (ImageMagick, parameters between input and output):
 ```
 -chop 5x5 -deskew 60% +repage -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW
 ```
-Full command: `magick -density $BW_DENSITY <input> $BW_PARAMS <output>`
+Full command: `magick -density $BW_DPI <input> $BW_PARAMS <output>`
 
 **Default `COLOR_PARAMS`** (Ghostscript, parameters before `-sOutputFile`):
 ```
@@ -57,7 +57,7 @@ All settings are controlled via environment variables.
 | `SW_PATTERN` | `scan-bw` | Filename prefix identifying B&W scans |
 | `MULTI_PATTERN` | `multi` | Substring identifying multi-page scans |
 | `DISABLE_MULTI` | `false` | `true` = ignore `MULTI_PATTERN`, process every file immediately |
-| `BW_DENSITY` | `300` | DPI density for ImageMagick B&W processing |
+| `BW_DPI` | `300` | DPI density for ImageMagick B&W processing |
 | `BW_PARAMS` | *(see below)* | ImageMagick parameters for B&W processing |
 | `COLOR_PARAMS` | *(see below)* | Ghostscript parameters for color processing |
 | `PAPERLESS_URL` | – | Base URL of your Paperless-ngx instance |
@@ -134,7 +134,7 @@ services:
       SW_PATTERN: scan-bw
       MULTI_PATTERN: multi
       BUTTON_PAUSE: "1800"
-      BW_DENSITY: "300"
+      BW_DPI: "300"
       # BW_PARAMS: "-chop 5x5 ..."     # optional: override ImageMagick parameters
       # COLOR_PARAMS: "-q ..."          # optional: override Ghostscript parameters
       # TG_API_KEY: "123456:ABC..."     # optional: Telegram bot token

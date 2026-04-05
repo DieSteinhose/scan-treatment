@@ -14,7 +14,7 @@ FAIL_PAUSE="${FAIL_PAUSE:-60}"           # seconds between Paperless upload retr
 SW_PATTERN="${SW_PATTERN:-scan-bw}"      # filename prefix identifying B&W scans (single: scan-bw*, multi: scan-bw-multi*)
 MULTI_PATTERN="${MULTI_PATTERN:-multi}"  # substring identifying multi-page scans (matches scan-bw-multi*, scan-color-multi*)
 DISABLE_MULTI="${DISABLE_MULTI:-false}"  # true = treat every file as single, ignore MULTI_PATTERN
-BW_DENSITY="${BW_DENSITY:-300}"
+BW_DPI="${BW_DPI:-300}"
 BW_PARAMS="${BW_PARAMS:--chop 5x5 -deskew 60% +repage -strip -interlace Plane -normalize -posterize 3 +dither -compress LZW}"
 COLOR_PARAMS="${COLOR_PARAMS:--q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dColorImageDownsampleType=/Bicubic -dColorImageResolution=300 -dGrayImageDownsampleType=/Bicubic -dGrayImageResolution=300}"
 PAPERLESS_URL="${PAPERLESS_URL:-}"
@@ -97,7 +97,7 @@ process_bw() {
     local -a params
     read -ra params <<< "$BW_PARAMS"
     log "Processing: black & white"
-    magick -density "$BW_DENSITY" "$input" "${params[@]}" "$output" \
+    magick -density "$BW_DPI" "$input" "${params[@]}" "$output" \
     && log_ok "B&W processing complete"
 }
 
