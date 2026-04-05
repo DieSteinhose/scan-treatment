@@ -121,6 +121,18 @@ process_pdf() {
     fi
 }
 
+# ── Wait for file to be fully written (SMB uploads in multiple chunks) ────────
+wait_for_stable() {
+    local file="$1"
+    local size1 size2
+    while true; do
+        size1=$(stat -c %s "$file" 2>/dev/null) || return 1
+        sleep 2
+        size2=$(stat -c %s "$file" 2>/dev/null) || return 1
+        [[ "$size1" == "$size2" ]] && return 0
+    done
+}
+
 # ── File size sanity check ─────────────────────────────────────────────────────
 check_file_size() {
     local file="$1" min_kb="${2:-100}"
@@ -248,12 +260,22 @@ process_batch() {
 # Also handles multi-page PDFs natively – both magick and ghostscript support them.
 process_single() {
     local filename="$1"
-    local timestamp output_file
+    local timestamp output_file file_lock="/tmp/scan_single_${filename}.lock"
+
+    # Prevent duplicate processing when inotifywait fires multiple close_write
+    # events for the same file (e.g. during SMB uploads). mkdir is atomic.
+    mkdir "$file_lock" 2>/dev/null || return 0
 
     printf -v timestamp '%(%Y-%m-%d_%H-%M-%S_)T' -1
     output_file="${EXPORT_DIR}${timestamp}${filename}"
 
     log "Processing: $filename"
+
+    if ! wait_for_stable "${WATCH_DIR}${filename}"; then
+        log_err "File disappeared while waiting: $filename"
+        rmdir "$file_lock" 2>/dev/null || true
+        return 1
+    fi
 
     if process_pdf "${WATCH_DIR}${filename}" "$output_file"; then
         rm -f "${WATCH_DIR}${filename}"
@@ -267,6 +289,7 @@ process_single() {
     else
         log_err "Processing failed: $filename"
     fi
+    rmdir "$file_lock" 2>/dev/null || true
 }
 
 # ── HTTP trigger server (for Home Assistant) ───────────────────────────────────
