@@ -9,7 +9,8 @@ ENV FAIL_PAUSE=60 \
     SW_PATTERN=scan-bw \
     MULTI_PATTERN=multi \
     PAPERLESS_URL= \
-    PAPERLESS_TOKEN=
+    PAPERLESS_TOKEN= \
+    TG_NOTIFY_SUCCESS=false
 
 RUN apk add --no-cache \
     bash \

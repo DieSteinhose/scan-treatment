@@ -18,6 +18,7 @@ PAPERLESS_URL="${PAPERLESS_URL:-}"
 PAPERLESS_TOKEN="${PAPERLESS_TOKEN:-}"
 TG_API_KEY="${TG_API_KEY:-}"
 TG_CHAT_ID="${TG_CHAT_ID:-}"
+TG_NOTIFY_SUCCESS="${TG_NOTIFY_SUCCESS:-false}" # true = also notify on successful uploads
 
 MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
@@ -84,7 +85,7 @@ upload_to_paperless_with_retry() {
         log_warn "Retrying in $FAIL_PAUSE seconds (attempt $attempt)..."
         sleep "$FAIL_PAUSE"
     done
-    tg_send "Document successfully uploaded to Paperless!"
+    [[ "$TG_NOTIFY_SUCCESS" == "true" ]] && tg_send "Document successfully uploaded to Paperless!"
 }
 
 # ── PDF processing ─────────────────────────────────────────────────────────────

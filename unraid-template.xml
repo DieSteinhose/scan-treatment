@@ -37,4 +37,5 @@
   <!-- Telegram -->
   <Config Name="Telegram Bot Token" Target="TG_API_KEY" Default="" Mode="" Description="Optional Telegram bot token for notifications (e.g. successful upload, errors)." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Telegram Chat ID" Target="TG_CHAT_ID" Default="" Mode="" Description="Optional Telegram chat ID for notifications." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Telegram Notify on Success" Target="TG_NOTIFY_SUCCESS" Default="false" Mode="" Description="Set to true to also send a Telegram notification on successful uploads. By default only errors are reported." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>

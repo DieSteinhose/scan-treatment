@@ -52,6 +52,7 @@ All settings are controlled via environment variables.
 | `FAIL_PAUSE` | `60` | Seconds between Paperless upload retries |
 | `TG_API_KEY` | – | Telegram bot token (optional) |
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
+| `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
 
 ## Home Assistant integration
 
