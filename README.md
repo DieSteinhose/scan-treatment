@@ -188,4 +188,13 @@ docker build -t scan-treatment .
 - Failed Paperless uploads are retried indefinitely every `FAIL_PAUSE` seconds.
 - Telegram notifications are fully optional. Nothing is sent if `TG_API_KEY` is unset.
 - In multi mode, only one batch runs at a time. Files arriving during an active batch are automatically added to the current stack.
-- Printer notifications (`PRINTER_NOTIFY=true`) work only in multi mode. The scan job's display name in the printer's scan menu reflects the current state: `[scan N]` while collecting pages, `[proc...]` while processing after the trigger, `[OK HH:MM]` or `[ERR HH:MM]` after completion. Status suffixes are automatically cleared after 60 minutes and on every container start. Tested with HP LaserJet MFP M130fw via the HP EWS web interface.
+- Printer notifications (`PRINTER_NOTIFY=true`) work only in multi mode. The scan job's display name in the printer's scan menu reflects the current state:
+  | State | Display |
+  |---|---|
+  | Collecting pages | `My Scan Job [scan 2]` |
+  | Processing after trigger | `My Scan Job [proc...]` |
+  | Done | `My Scan Job [OK 14:32]` or `[ERR 14:32]` |
+  | Done, but next batch already collecting | `My Scan Job [OK scan 1]`, `[OK scan 2]`, ... |
+  | 60 minutes after completion | `My Scan Job` (suffix cleared) |
+
+  If pages for a new batch arrive while the previous one is still processing, the completion notification combines both states: `[OK scan N]` shows that the previous batch succeeded and N pages are already queued for the next one. Further pages increment the count. Once the trigger fires for the new batch, the display transitions to `[proc...]` as normal. Status suffixes are also cleared on every container start. Tested with HP LaserJet MFP M130fw via the HP EWS web interface.
