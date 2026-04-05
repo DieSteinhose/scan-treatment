@@ -310,6 +310,7 @@ cleanup() {
     log "Shutting down..."
     rm -f "$LOCK_FILE" "$TRIGGER_FILE"
     [[ -n "$HTTP_PID" ]] && kill "$HTTP_PID" 2>/dev/null || true
+    pkill -P $$ inotifywait 2>/dev/null || pkill inotifywait 2>/dev/null || true
     jobs -p | xargs -r kill 2>/dev/null || true
 }
 
