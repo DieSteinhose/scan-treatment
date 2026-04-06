@@ -147,7 +147,7 @@ case "${path%%\?*}" in
         else
             filename="${SW_PATTERN}-$(date +%s).pdf"
             respond "202 Accepted" "Scanning (B&W ${ESCL_BW_DPI}dpi) → ${filename}"
-            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" &
+            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" </dev/null >/dev/null &
         fi
         ;;
 
@@ -157,7 +157,7 @@ case "${path%%\?*}" in
         else
             filename="scan-color-$(date +%s).pdf"
             respond "202 Accepted" "Scanning (color ${ESCL_COLOR_DPI}dpi) → ${filename}"
-            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" &
+            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" </dev/null >/dev/null &
         fi
         ;;
 
@@ -173,11 +173,11 @@ case "${path%%\?*}" in
             if [[ "$bw_count" -gt 0 ]]; then
                 filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
                 respond "202 Accepted" "Scanning (B&W ${ESCL_BW_DPI}dpi) → ${filename}"
-                escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" &
+                escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" </dev/null >/dev/null &
             elif [[ "$color_count" -gt 0 ]]; then
                 filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
                 respond "202 Accepted" "Scanning (color ${ESCL_COLOR_DPI}dpi) → ${filename}"
-                escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" &
+                escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" </dev/null >/dev/null &
             else
                 respond "409 Conflict" "No active batch found. Start one with /scan/multi/bw or /scan/multi/color."
             fi
@@ -190,7 +190,7 @@ case "${path%%\?*}" in
         else
             filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
             respond "202 Accepted" "Scanning (B&W ${ESCL_BW_DPI}dpi) → ${filename}"
-            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" &
+            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" </dev/null >/dev/null &
         fi
         ;;
 
@@ -200,7 +200,7 @@ case "${path%%\?*}" in
         else
             filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
             respond "202 Accepted" "Scanning (color ${ESCL_COLOR_DPI}dpi) → ${filename}"
-            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" &
+            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" </dev/null >/dev/null &
         fi
         ;;
 
