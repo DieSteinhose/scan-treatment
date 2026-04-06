@@ -16,17 +16,13 @@ respond() {
         "$code" "$body"
 }
 
-# Trigger an eSCL scan and save the result as FILENAME into WATCH_DIR.
+# Trigger an eSCL scan and save the result to WATCH_DIR.
+# Runs silently – all feedback goes to stderr (scan.sh log), not stdout (HTTP response).
 # $1 = color mode (Grayscale8 | RGB24)
-# $2 = DPI (e.g. 300 or 600)
+# $2 = DPI
 # $3 = destination filename (without path)
 escl_scan() {
     local color_mode="$1" dpi="$2" filename="$3"
-
-    if [[ -z "$PRINTER_IP" ]]; then
-        respond "503 Service Unavailable" "PRINTER_IP is not configured."
-        return 1
-    fi
 
     # Create eSCL scan job
     local job_uri
@@ -48,8 +44,7 @@ escl_scan() {
         | grep -i '^Location:' | sed 's/[Ll]ocation: *//; s/\r//')
 
     if [[ -z "$job_uri" ]]; then
-        respond "502 Bad Gateway" "eSCL scan job could not be created. Is the printer on and ready?"
-        echo "[$(date '+%H:%M:%S')] [HTTP] eSCL: failed to create scan job" >&2
+        echo "[$(date '+%H:%M:%S')] [HTTP] eSCL: failed to create scan job – printer off or not ready?" >&2
         return 1
     fi
 
@@ -63,7 +58,6 @@ escl_scan() {
 
     if [[ "$http_code" != "200" ]]; then
         rm -f "$dest"
-        respond "502 Bad Gateway" "eSCL scan failed or timed out (HTTP ${http_code:-timeout})."
         echo "[$(date '+%H:%M:%S')] [HTTP] eSCL: document download failed (HTTP ${http_code:-timeout})" >&2
         return 1
     fi
@@ -73,7 +67,6 @@ escl_scan() {
 }
 
 # Determine next available filename for multi-page batches.
-# Returns e.g. scan-bw-multi.pdf for the first page, scan-bw-multi2.pdf for the second, etc.
 next_multi_filename() {
     local base="$1"  # e.g. scan-bw-multi  or  scan-color-multi
     local count
@@ -106,52 +99,67 @@ case "${path%%\?*}" in
         respond "200 OK" "OK"
         ;;
 
-    # ── eSCL single-page endpoints ─────────────────────────────────────────────
+    # ── eSCL endpoints – respond immediately, scan runs in background ──────────
     /scan/single/bw|/scan/single/bw/)
-        filename="${SW_PATTERN}-$(date +%s).pdf"
-        if escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename"; then
-            respond "200 OK" "Scan started: ${filename}"
+        if [[ -z "$PRINTER_IP" ]]; then
+            respond "503 Service Unavailable" "PRINTER_IP is not configured."
+        else
+            filename="${SW_PATTERN}-$(date +%s).pdf"
+            respond "202 Accepted" "Scanning (B&W ${ESCL_BW_DPI}dpi) → ${filename}"
+            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" &
         fi
         ;;
 
     /scan/single/color|/scan/single/color/)
-        filename="scan-color-$(date +%s).pdf"
-        if escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename"; then
-            respond "200 OK" "Scan started: ${filename}"
+        if [[ -z "$PRINTER_IP" ]]; then
+            respond "503 Service Unavailable" "PRINTER_IP is not configured."
+        else
+            filename="scan-color-$(date +%s).pdf"
+            respond "202 Accepted" "Scanning (color ${ESCL_COLOR_DPI}dpi) → ${filename}"
+            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" &
         fi
         ;;
 
-    # ── eSCL multi-page endpoints ──────────────────────────────────────────────
     /scan/multi/next|/scan/multi/next/)
-        # Continue the current batch in whatever mode was started
-        bw_count=$(find "${WATCH_DIR%/}" -maxdepth 1 \
-            -name "${SW_PATTERN}-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
-        color_count=$(find "${WATCH_DIR%/}" -maxdepth 1 \
-            -name "scan-color-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
-        if [[ "$bw_count" -gt 0 ]]; then
-            filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
-            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" \
-                && respond "200 OK" "Page added (B&W): ${filename}"
-        elif [[ "$color_count" -gt 0 ]]; then
-            filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
-            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" \
-                && respond "200 OK" "Page added (color): ${filename}"
+        if [[ -z "$PRINTER_IP" ]]; then
+            respond "503 Service Unavailable" "PRINTER_IP is not configured."
         else
-            respond "409 Conflict" "No active batch found. Start one with /scan/multi/bw or /scan/multi/color."
+            # Continue the current batch in whatever mode was started
+            bw_count=$(find "${WATCH_DIR%/}" -maxdepth 1 \
+                -name "${SW_PATTERN}-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
+            color_count=$(find "${WATCH_DIR%/}" -maxdepth 1 \
+                -name "scan-color-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
+            if [[ "$bw_count" -gt 0 ]]; then
+                filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
+                respond "202 Accepted" "Scanning (B&W ${ESCL_BW_DPI}dpi) → ${filename}"
+                escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" &
+            elif [[ "$color_count" -gt 0 ]]; then
+                filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
+                respond "202 Accepted" "Scanning (color ${ESCL_COLOR_DPI}dpi) → ${filename}"
+                escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" &
+            else
+                respond "409 Conflict" "No active batch found. Start one with /scan/multi/bw or /scan/multi/color."
+            fi
         fi
         ;;
 
     /scan/multi/bw|/scan/multi/bw/)
-        filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
-        if escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename"; then
-            respond "200 OK" "Page added: ${filename}"
+        if [[ -z "$PRINTER_IP" ]]; then
+            respond "503 Service Unavailable" "PRINTER_IP is not configured."
+        else
+            filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
+            respond "202 Accepted" "Scanning (B&W ${ESCL_BW_DPI}dpi) → ${filename}"
+            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" &
         fi
         ;;
 
     /scan/multi/color|/scan/multi/color/)
-        filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
-        if escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename"; then
-            respond "200 OK" "Page added: ${filename}"
+        if [[ -z "$PRINTER_IP" ]]; then
+            respond "503 Service Unavailable" "PRINTER_IP is not configured."
+        else
+            filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
+            respond "202 Accepted" "Scanning (color ${ESCL_COLOR_DPI}dpi) → ${filename}"
+            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" &
         fi
         ;;
 
