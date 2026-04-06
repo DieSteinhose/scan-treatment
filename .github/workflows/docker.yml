@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/*
     tags:
       - "v*"
     paths-ignore:
@@ -44,6 +45,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute feature branch tag
+        id: branch
+        if: startsWith(github.ref, 'refs/heads/feature/')
+        run: |
+          tag=$(echo "${{ github.ref_name }}" | sed 's|feature/||; s|/|-|g; s|_|-|g')
+          echo "tag=dev-${tag}" >> "$GITHUB_OUTPUT"
+
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -52,6 +60,8 @@ jobs:
           tags: |
             # push to main → dev
             type=raw,value=dev,enable={{is_default_branch}}
+            # push to feature/* → dev-<branch> (e.g. dev-escl-scan)
+            type=raw,value=${{ steps.branch.outputs.tag }},enable=${{ steps.branch.outputs.tag != '' }}
             # v1.1.0 → 1.1.0
             type=semver,pattern={{version}}
             # v1.1.0 → 1.1

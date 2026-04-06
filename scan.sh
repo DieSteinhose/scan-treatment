@@ -23,14 +23,18 @@ TG_API_KEY="${TG_API_KEY:-}"
 TG_CHAT_ID="${TG_CHAT_ID:-}"
 TG_NOTIFY_SUCCESS="${TG_NOTIFY_SUCCESS:-false}" # true = also notify on successful uploads
 PRINTER_NOTIFY="${PRINTER_NOTIFY:-false}"       # true = send scan-menu status updates to the printer (requires PRINTER_IP)
-PRINTER_IP="${PRINTER_IP:-}"                    # Printer IP address (required when PRINTER_NOTIFY=true)
+PRINTER_IP="${PRINTER_IP:-}"                    # Printer IP address (required when PRINTER_NOTIFY=true or using /scan/* endpoints)
 PRINTER_USER="${PRINTER_USER:-}"               # Filter: only update jobs whose name contains this string
+ESCL_BW_DPI="${ESCL_BW_DPI:-600}"             # DPI for eSCL B&W scans via /scan/* endpoints
+ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-600}"        # DPI for eSCL color scans via /scan/* endpoints
 
 MERGE_NAME=".merge_tmp.pdf"
 TRIGGER_FILE="/tmp/scan_trigger"
 LOCK_FILE="/tmp/scan_processing.lock"
 TRIGGERED_FILE="/tmp/scan_triggered"
 CHAINED_FILE="/tmp/scan_chained"
+SINGLE_FILE="/tmp/scan_single_active"
+STATUS_FILE="/tmp/scan_last_result"
 HTTP_PID=""
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
@@ -398,6 +402,7 @@ process_batch() {
 
             if check_file_size "$output_file"; then
                 upload_to_paperless_with_retry "$output_file"
+                echo "ok $(date '+%H:%M')" > "$STATUS_FILE"
                 # If files arrived during processing, show [OK scan N] instead of [OK HH:MM]
                 local queued
                 queued=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
@@ -411,17 +416,20 @@ process_batch() {
                 fi
             else
                 log_err "Skipping upload due to failed size check: $output_file"
+                echo "err $(date '+%H:%M')" > "$STATUS_FILE"
                 printer_notify "$first_filename" err
                 ( sleep 3600; printer_notify "$first_filename" reset ) &
             fi
         else
             log_err "PDF processing failed"
+            echo "err $(date '+%H:%M')" > "$STATUS_FILE"
             rm -f "$merge_tmp"
             printer_notify "$first_filename" err
             ( sleep 3600; printer_notify "$first_filename" reset ) &
         fi
     else
         log_err "Merge failed"
+        echo "err $(date '+%H:%M')" > "$STATUS_FILE"
     fi
 
     rm -f "$LOCK_FILE" "$TRIGGERED_FILE" "$trigger_ref"
@@ -450,6 +458,7 @@ process_single() {
     # Prevent duplicate processing when inotifywait fires multiple close_write
     # events for the same file (e.g. during SMB uploads). mkdir is atomic.
     mkdir "$file_lock" 2>/dev/null || return 0
+    touch "$SINGLE_FILE"
 
     printf -v timestamp '%(%Y-%m-%d_%H-%M-%S_)T' -1
     output_file="${EXPORT_DIR}${timestamp}${filename}"
@@ -458,6 +467,7 @@ process_single() {
 
     if ! wait_for_stable "${WATCH_DIR}${filename}"; then
         log_err "File disappeared while waiting: $filename"
+        rm -f "$SINGLE_FILE"
         rmdir "$file_lock" 2>/dev/null || true
         return 1
     fi
@@ -468,12 +478,16 @@ process_single() {
 
         if check_file_size "$output_file"; then
             upload_to_paperless_with_retry "$output_file"
+            echo "ok $(date '+%H:%M')" > "$STATUS_FILE"
         else
             log_err "Skipping upload due to failed size check: $output_file"
+            echo "err $(date '+%H:%M')" > "$STATUS_FILE"
         fi
     else
         log_err "Processing failed: $filename"
+        echo "err $(date '+%H:%M')" > "$STATUS_FILE"
     fi
+    rm -f "$SINGLE_FILE"
     rmdir "$file_lock" 2>/dev/null || true
 }
 
@@ -528,10 +542,15 @@ main() {
     else
         log "Printer:   disabled (PRINTER_NOTIFY=false)"
     fi
+    if [[ -n "$PRINTER_IP" ]]; then
+        log "eSCL:      ${PRINTER_IP}  BW=${ESCL_BW_DPI}dpi  color=${ESCL_COLOR_DPI}dpi"
+    else
+        log "eSCL:      disabled (PRINTER_IP not set)"
+    fi
     log "============================================="
 
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
-    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE" "$CHAINED_FILE"
+    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE" "$CHAINED_FILE" "$SINGLE_FILE" "$STATUS_FILE"
 
     # Start HTTP server first so the trigger endpoint is ready before any batch processing
     start_http_server

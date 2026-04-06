@@ -71,29 +71,42 @@ All settings are controlled via environment variables.
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 | `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
 | `PRINTER_NOTIFY` | `false` | `true` = update the matching scan job's display name in the printer menu after each multi-page batch |
-| `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true`) |
+| `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true` or using `/scan/*` endpoints) |
 | `PRINTER_USER` | – | Optional filter: only update jobs whose display name contains this string. Useful when multiple containers share one printer. |
+| `ESCL_BW_DPI` | `600` | DPI for B&W scans via `/scan/single/bw` and `/scan/multi/bw` |
+| `ESCL_COLOR_DPI` | `600` | DPI for color scans via `/scan/single/color` and `/scan/multi/color` |
 | `TZ` | `Europe/Berlin` | Timezone for log timestamps and output filenames (e.g. `Europe/London`, `America/New_York`) |
 
-## Trigger endpoint
+## HTTP endpoints
 
-> **Only required in multi mode (`DISABLE_MULTI=false`).** If your printer produces multi-page PDFs natively, set `DISABLE_MULTI=true` and skip this section entirely.
+All endpoints accept GET and POST. The container exposes them on `HTTP_PORT` (default `8080`).
 
-Once all pages are scanned, the processing is started by calling the `/trigger` endpoint. This can be done by anything that can make an HTTP request – a Home Assistant button, a browser bookmark, a curl command, or any other tool.
+| Path | Description |
+|---|---|
+| `/trigger` | Start multi-page processing |
+| `/health` | Health check, returns `200 OK` |
+| `/scan/single/bw` | Scan one B&W page and process immediately |
+| `/scan/single/color` | Scan one color page and process immediately |
+| `/scan/multi/bw` | Add a B&W page to the current multi-page batch |
+| `/scan/multi/color` | Add a color page to the current multi-page batch |
+| `/scan/multi/next` | Add a page in the same mode as the current batch (auto-detects B&W or color) |
+
+The `/scan/*` endpoints require `PRINTER_IP` to be set and eSCL to be enabled on the printer (HP EWS → Networking → eSCL (AirPrint Scan): enabled). They trigger the scan directly via the printer's eSCL API, save the resulting PDF to `WATCH_DIR`, and let the existing processing pipeline handle it — no SMB share or physical button press needed.
 
 ```bash
 # trigger manually
 curl http://<host>:8080/trigger
+
+# scan single B&W page and upload to Paperless
+curl http://<host>:8080/scan/single/bw
+
+# add a page to a multi-page batch, then trigger processing
+curl http://<host>:8080/scan/multi/bw
+curl http://<host>:8080/scan/multi/bw
+curl http://<host>:8080/trigger
 ```
 
-Available endpoints:
-
-| Path | Description |
-|---|---|
-| `/trigger` | Start processing (GET or POST) |
-| `/health` | Health check, returns `200 OK` |
-
-**Example: Home Assistant button**
+**Example: Home Assistant buttons**
 
 ```yaml
 # configuration.yaml
@@ -101,11 +114,20 @@ rest_command:
   scan_trigger:
     url: http://192.168.1.x:8080/trigger
     method: POST
+  scan_single_bw:
+    url: http://192.168.1.x:8080/scan/single/bw
+    method: POST
+  scan_multi_bw:
+    url: http://192.168.1.x:8080/scan/multi/bw
+    method: POST
+  scan_multi_color:
+    url: http://192.168.1.x:8080/scan/multi/color
+    method: POST
 ```
 
 ```yaml
 # automation / button action
-action: rest_command.scan_trigger
+action: rest_command.scan_single_bw
 ```
 
 ## Filename convention

@@ -14,6 +14,8 @@ ENV FAIL_PAUSE=60 \
     PRINTER_NOTIFY=false \
     PRINTER_IP= \
     PRINTER_USER= \
+    ESCL_BW_DPI=600 \
+    ESCL_COLOR_DPI=600 \
     TZ=Europe/Berlin
 
 RUN apk add --no-cache \
