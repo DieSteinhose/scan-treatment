@@ -11,6 +11,7 @@ ESCL_BW_DPI="${ESCL_BW_DPI:-600}"
 ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-600}"
 LOCK_FILE="${LOCK_FILE:-/tmp/scan_processing.lock}"
 TRIGGERED_FILE="${TRIGGERED_FILE:-/tmp/scan_triggered}"
+SINGLE_FILE="${SINGLE_FILE:-/tmp/scan_single_active}"
 SCANNING_FILE="${SCANNING_FILE:-/tmp/scan_escl_active}"
 STATUS_FILE="${STATUS_FILE:-/tmp/scan_last_result}"
 
@@ -99,7 +100,7 @@ case "${path%%\?*}" in
 
     /status|/status/)
         # Derive state from flag files
-        if [[ -f "$TRIGGERED_FILE" ]]; then
+        if [[ -f "$TRIGGERED_FILE" ]] || [[ -f "$SINGLE_FILE" ]]; then
             state="processing"
         elif [[ -f "$LOCK_FILE" ]]; then
             state="collecting"
