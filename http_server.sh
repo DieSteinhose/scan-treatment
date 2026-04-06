@@ -89,7 +89,14 @@ next_multi_filename() {
 
 # ── Read request ───────────────────────────────────────────────────────────────
 read -r request
+method=$(printf '%s' "$request" | cut -d' ' -f1 | tr -d '\r\n')
 path=$(printf '%s' "$request" | cut -d' ' -f2 | tr -d '\r\n')
+
+# Silently drop non-HTTP connections (e.g. TLS handshakes from network scanners)
+case "$method" in
+    GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH) ;;
+    *) exit 0 ;;
+esac
 
 # Drain remaining headers
 while IFS= read -r -t 2 line; do
