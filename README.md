@@ -2,6 +2,8 @@
 
 Docker container for automatic scanner PDF processing. Optimizes black & white and color scans and uploads them directly to [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) via API. Multi-page document assembly is triggered via a Home Assistant button.
 
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 ## How it works
 
 The container watches an input directory using `inotifywait`. When the scanner drops a file, it is processed immediately (single mode) or collected with other pages and processed after a trigger (multi mode).
@@ -60,8 +62,8 @@ All settings are controlled via environment variables.
 | `MULTI_PATTERN` | `multi` | Substring identifying multi-page scans |
 | `DISABLE_MULTI` | `false` | `true` = ignore `MULTI_PATTERN`, process every file immediately |
 | `BW_DPI` | `300` | DPI density for ImageMagick B&W processing |
-| `BW_PARAMS` | *(see below)* | ImageMagick parameters for B&W processing |
-| `COLOR_PARAMS` | *(see below)* | Ghostscript parameters for color processing |
+| `BW_PARAMS` | *(see above)* | ImageMagick parameters for B&W processing |
+| `COLOR_PARAMS` | *(see above)* | Ghostscript parameters for color processing |
 | `PAPERLESS_URL` | – | Base URL of your Paperless-ngx instance |
 | `PAPERLESS_TOKEN` | – | API token – found in the Django admin panel (`/admin`) under **Tokens** |
 | `HTTP_PORT` | `8080` | Port for the HTTP trigger endpoint |
@@ -70,8 +72,8 @@ All settings are controlled via environment variables.
 | `TG_API_KEY` | – | Telegram bot token (optional) |
 | `TG_CHAT_ID` | – | Telegram chat ID (optional) |
 | `TG_NOTIFY_SUCCESS` | `false` | `true` = also send Telegram notification on successful uploads |
-| `PRINTER_NOTIFY` | `false` | `true` = update the matching scan job's display name in the printer menu after each multi-page batch |
-| `PRINTER_IP` | – | Printer IP address (required when `PRINTER_NOTIFY=true` or using `/scan/*` endpoints) |
+| `PRINTER_NOTIFY` | `false` | `true` = update the matching scan job's display name in the printer menu after each batch |
+| `PRINTER_IP` | – | Printer IP address. Required for `PRINTER_NOTIFY=true` and all `/scan/*` endpoints. **eSCL scanning is disabled if this is not set.** |
 | `PRINTER_USER` | – | Optional filter: only update jobs whose display name contains this string. Useful when multiple containers share one printer. |
 | `ESCL_BW_DPI` | `600` | DPI for B&W scans via `/scan/single/bw` and `/scan/multi/bw` |
 | `ESCL_COLOR_DPI` | `600` | DPI for color scans via `/scan/single/color` and `/scan/multi/color` |
@@ -85,25 +87,71 @@ All endpoints accept GET and POST. The container exposes them on `HTTP_PORT` (de
 |---|---|
 | `/trigger` | Start multi-page processing |
 | `/health` | Health check, returns `200 OK` |
-| `/scan/single/bw` | Scan one B&W page and process immediately |
-| `/scan/single/color` | Scan one color page and process immediately |
-| `/scan/multi/bw` | Add a B&W page to the current multi-page batch |
-| `/scan/multi/color` | Add a color page to the current multi-page batch |
-| `/scan/multi/next` | Add a page in the same mode as the current batch (auto-detects B&W or color) |
-
-The `/scan/*` endpoints require `PRINTER_IP` to be set and eSCL to be enabled on the printer (HP EWS → Networking → eSCL (AirPrint Scan): enabled). They trigger the scan directly via the printer's eSCL API, save the resulting PDF to `WATCH_DIR`, and let the existing processing pipeline handle it — no SMB share or physical button press needed.
+| `/status` | Current scan state as JSON |
+| `/scan/single/bw` | Scan one B&W page and process immediately *(requires `PRINTER_IP`)* |
+| `/scan/single/color` | Scan one color page and process immediately *(requires `PRINTER_IP`)* |
+| `/scan/multi/bw` | Add a B&W page to the current multi-page batch *(requires `PRINTER_IP`)* |
+| `/scan/multi/color` | Add a color page to the current multi-page batch *(requires `PRINTER_IP`)* |
+| `/scan/multi/next` | Add a page in the same mode as the current batch, auto-detects B&W or color *(requires `PRINTER_IP`)* |
 
 ```bash
 # trigger manually
 curl http://<host>:8080/trigger
 
+# current state
+curl http://<host>:8080/status
+
 # scan single B&W page and upload to Paperless
 curl http://<host>:8080/scan/single/bw
 
-# add a page to a multi-page batch, then trigger processing
+# add pages to a multi-page batch, then trigger processing
 curl http://<host>:8080/scan/multi/bw
-curl http://<host>:8080/scan/multi/bw
+curl http://<host>:8080/scan/multi/next
 curl http://<host>:8080/trigger
+```
+
+### eSCL scanning (`/scan/*`)
+
+The `/scan/*` endpoints trigger the scanner directly via the [eSCL (AirPrint Scan)](https://github.com/alexpevzner/sane-airscan) protocol — no SMB share or physical button press required. The printer handles the scan and the container downloads the result automatically.
+
+**eSCL is only active when `PRINTER_IP` is set.** Without it, all `/scan/*` endpoints return `503 Service Unavailable`. To disable eSCL scanning while keeping `PRINTER_NOTIFY` active, simply remove `PRINTER_IP` — but note that `PRINTER_NOTIFY` also requires it, so set `PRINTER_NOTIFY=false` as well if you want neither feature.
+
+eSCL must also be enabled on the printer itself. On HP printers this is typically found under **EWS → Networking → eSCL (AirPrint Scan)**. For a list of printers known to support eSCL, see the [sane-airscan tested devices list](https://github.com/alexpevzner/sane-airscan#tested-devices).
+
+All `/scan/*` endpoints respond with `202 Accepted` immediately and run the scan in the background, so Home Assistant `rest_command` calls do not time out.
+
+### Status endpoint (`/status`)
+
+Returns a JSON object with the current container state:
+
+```json
+{"state":"collecting","mode":"bw","pages":3,"last_result":"ok","last_time":"14:32"}
+```
+
+| Field | Values | Description |
+|---|---|---|
+| `state` | `idle`, `scanning`, `collecting`, `processing` | Current activity |
+| `mode` | `bw`, `color`, `null` | Active batch mode |
+| `pages` | integer | Pages collected in current batch |
+| `last_result` | `ok`, `err`, `null` | Result of last completed batch |
+| `last_time` | `HH:MM`, `null` | Time of last completed batch |
+
+**Example: Home Assistant sensor**
+
+```yaml
+# configuration.yaml
+rest:
+  - resource: http://192.168.1.x:8080/status
+    scan_interval: 5
+    sensor:
+      - name: "Scanner Status"
+        unique_id: scanner_status
+        value_template: "{{ value_json.state }}"
+        json_attributes:
+          - mode
+          - pages
+          - last_result
+          - last_time
 ```
 
 **Example: Home Assistant buttons**
@@ -123,11 +171,6 @@ rest_command:
   scan_multi_color:
     url: http://192.168.1.x:8080/scan/multi/color
     method: POST
-```
-
-```yaml
-# automation / button action
-action: rest_command.scan_single_bw
 ```
 
 ## Filename convention
@@ -175,8 +218,10 @@ services:
       # TG_CHAT_ID: "123456789"         # optional: Telegram chat ID
       # TG_NOTIFY_SUCCESS: "false"      # optional: notify on successful uploads
       # PRINTER_NOTIFY: "true"          # optional: update printer scan-menu on batch completion
-      # PRINTER_IP: "192.168.1.x"       # optional: printer IP (required when PRINTER_NOTIFY=true)
-      # PRINTER_USER: "Alice"            # optional: filter to only update jobs with this name
+      # PRINTER_IP: "192.168.1.x"       # optional: required for PRINTER_NOTIFY and /scan/* endpoints
+      # PRINTER_USER: "Alice"           # optional: filter to only update jobs with this name
+      # ESCL_BW_DPI: "600"             # optional: DPI for /scan/*/bw endpoints
+      # ESCL_COLOR_DPI: "600"          # optional: DPI for /scan/*/color endpoints
 ```
 
 ## Unraid
