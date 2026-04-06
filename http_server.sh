@@ -9,6 +9,9 @@ SW_PATTERN="${SW_PATTERN:-scan-bw}"
 MULTI_PATTERN="${MULTI_PATTERN:-multi}"
 ESCL_BW_DPI="${ESCL_BW_DPI:-600}"
 ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-600}"
+LOCK_FILE="${LOCK_FILE:-/tmp/scan_processing.lock}"
+TRIGGERED_FILE="${TRIGGERED_FILE:-/tmp/scan_triggered}"
+STATUS_FILE="${STATUS_FILE:-/tmp/scan_last_result}"
 
 respond() {
     local code="$1" body="$2"
@@ -89,6 +92,44 @@ done
 
 case "${path%%\?*}" in
 
+    /status|/status/)
+        # Derive state from flag files
+        if [[ -f "$TRIGGERED_FILE" ]]; then
+            state="processing"
+        elif [[ -f "$LOCK_FILE" ]]; then
+            state="collecting"
+        else
+            state="idle"
+        fi
+
+        # Count pages in current batch and detect mode
+        bw_pages=$(find "${WATCH_DIR%/}" -maxdepth 1 \
+            -name "${SW_PATTERN}-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
+        color_pages=$(find "${WATCH_DIR%/}" -maxdepth 1 \
+            -name "scan-color-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "$bw_pages" -gt 0 ]]; then
+            mode="bw"
+            pages=$bw_pages
+        elif [[ "$color_pages" -gt 0 ]]; then
+            mode="color"
+            pages=$color_pages
+        else
+            mode="null"
+            pages=0
+        fi
+
+        # Read last processing result
+        last_result="null"
+        last_time="null"
+        if [[ -f "$STATUS_FILE" ]]; then
+            read -r last_result last_time < "$STATUS_FILE"
+        fi
+
+        printf "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n"
+        printf '{"state":"%s","mode":"%s","pages":%s,"last_result":"%s","last_time":"%s"}\n' \
+            "$state" "$mode" "$pages" "$last_result" "$last_time"
+        ;;
+
     /trigger|/trigger/)
         touch "${TRIGGER_FILE:-/tmp/scan_trigger}"
         respond "200 OK" "Triggered!"
@@ -167,6 +208,7 @@ case "${path%%\?*}" in
         respond "404 Not Found" "Not found. Available endpoints:
   /trigger             – start multi-page processing
   /health              – health check
+  /status              – current scan state (JSON)
   /scan/single/bw      – scan one B&W page and process immediately
   /scan/single/color   – scan one color page and process immediately
   /scan/multi/bw       – add a B&W page to the current multi-page batch

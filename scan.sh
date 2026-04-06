@@ -33,6 +33,7 @@ TRIGGER_FILE="/tmp/scan_trigger"
 LOCK_FILE="/tmp/scan_processing.lock"
 TRIGGERED_FILE="/tmp/scan_triggered"
 CHAINED_FILE="/tmp/scan_chained"
+STATUS_FILE="/tmp/scan_last_result"
 HTTP_PID=""
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
@@ -400,6 +401,7 @@ process_batch() {
 
             if check_file_size "$output_file"; then
                 upload_to_paperless_with_retry "$output_file"
+                echo "ok $(date '+%H:%M')" > "$STATUS_FILE"
                 # If files arrived during processing, show [OK scan N] instead of [OK HH:MM]
                 local queued
                 queued=$(find "$WATCH_DIR" -maxdepth 1 -name "*.pdf" \
@@ -413,17 +415,20 @@ process_batch() {
                 fi
             else
                 log_err "Skipping upload due to failed size check: $output_file"
+                echo "err $(date '+%H:%M')" > "$STATUS_FILE"
                 printer_notify "$first_filename" err
                 ( sleep 3600; printer_notify "$first_filename" reset ) &
             fi
         else
             log_err "PDF processing failed"
+            echo "err $(date '+%H:%M')" > "$STATUS_FILE"
             rm -f "$merge_tmp"
             printer_notify "$first_filename" err
             ( sleep 3600; printer_notify "$first_filename" reset ) &
         fi
     else
         log_err "Merge failed"
+        echo "err $(date '+%H:%M')" > "$STATUS_FILE"
     fi
 
     rm -f "$LOCK_FILE" "$TRIGGERED_FILE" "$trigger_ref"
@@ -470,11 +475,14 @@ process_single() {
 
         if check_file_size "$output_file"; then
             upload_to_paperless_with_retry "$output_file"
+            echo "ok $(date '+%H:%M')" > "$STATUS_FILE"
         else
             log_err "Skipping upload due to failed size check: $output_file"
+            echo "err $(date '+%H:%M')" > "$STATUS_FILE"
         fi
     else
         log_err "Processing failed: $filename"
+        echo "err $(date '+%H:%M')" > "$STATUS_FILE"
     fi
     rmdir "$file_lock" 2>/dev/null || true
 }
@@ -538,7 +546,7 @@ main() {
     log "============================================="
 
     mkdir -p "$WATCH_DIR" "$EXPORT_DIR"
-    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE" "$CHAINED_FILE"
+    rm -f "$LOCK_FILE" "$TRIGGER_FILE" "$TRIGGERED_FILE" "$CHAINED_FILE" "$STATUS_FILE"
 
     # Start HTTP server first so the trigger endpoint is ready before any batch processing
     start_http_server
