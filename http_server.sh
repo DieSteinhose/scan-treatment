@@ -11,6 +11,7 @@ ESCL_BW_DPI="${ESCL_BW_DPI:-600}"
 ESCL_COLOR_DPI="${ESCL_COLOR_DPI:-600}"
 LOCK_FILE="${LOCK_FILE:-/tmp/scan_processing.lock}"
 TRIGGERED_FILE="${TRIGGERED_FILE:-/tmp/scan_triggered}"
+SCANNING_FILE="${SCANNING_FILE:-/tmp/scan_escl_active}"
 STATUS_FILE="${STATUS_FILE:-/tmp/scan_last_result}"
 
 respond() {
@@ -26,6 +27,7 @@ respond() {
 # $3 = destination filename (without path)
 escl_scan() {
     local color_mode="$1" dpi="$2" filename="$3"
+    touch "$SCANNING_FILE"
 
     # Create eSCL scan job
     local job_uri
@@ -48,6 +50,7 @@ escl_scan() {
 
     if [[ -z "$job_uri" ]]; then
         echo "[$(date '+%H:%M:%S')] [HTTP] eSCL: failed to create scan job – printer off or not ready?" >&2
+        rm -f "$SCANNING_FILE"
         return 1
     fi
 
@@ -62,10 +65,12 @@ escl_scan() {
     if [[ "$http_code" != "200" ]]; then
         rm -f "$dest"
         echo "[$(date '+%H:%M:%S')] [HTTP] eSCL: document download failed (HTTP ${http_code:-timeout})" >&2
+        rm -f "$SCANNING_FILE"
         return 1
     fi
 
     echo "[$(date '+%H:%M:%S')] [HTTP] eSCL: scan saved as ${filename}" >&2
+    rm -f "$SCANNING_FILE"
     return 0
 }
 
@@ -98,6 +103,8 @@ case "${path%%\?*}" in
             state="processing"
         elif [[ -f "$LOCK_FILE" ]]; then
             state="collecting"
+        elif [[ -f "$SCANNING_FILE" ]]; then
+            state="scanning"
         else
             state="idle"
         fi
