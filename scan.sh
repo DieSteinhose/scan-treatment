@@ -3,7 +3,7 @@
 # Uploads documents directly to Paperless-ngx via API
 # Home Assistant trigger via HTTP GET/POST on /trigger
 # HTTP server: socat + http_server.sh (no Python required)
-VERSION="4.0.0"
+VERSION="4.1.0"
 
 # ── Configuration (overridable via ENV) ────────────────────────────────────────
 WATCH_DIR="${WATCH_DIR:-/data/import/}"
