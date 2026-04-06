@@ -122,6 +122,25 @@ case "${path%%\?*}" in
         ;;
 
     # ── eSCL multi-page endpoints ──────────────────────────────────────────────
+    /scan/multi/next|/scan/multi/next/)
+        # Continue the current batch in whatever mode was started
+        bw_count=$(find "${WATCH_DIR%/}" -maxdepth 1 \
+            -name "${SW_PATTERN}-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
+        color_count=$(find "${WATCH_DIR%/}" -maxdepth 1 \
+            -name "scan-color-${MULTI_PATTERN}*.pdf" 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "$bw_count" -gt 0 ]]; then
+            filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
+            escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename" \
+                && respond "200 OK" "Page added (B&W): ${filename}"
+        elif [[ "$color_count" -gt 0 ]]; then
+            filename=$(next_multi_filename "scan-color-${MULTI_PATTERN}")
+            escl_scan "RGB24" "$ESCL_COLOR_DPI" "$filename" \
+                && respond "200 OK" "Page added (color): ${filename}"
+        else
+            respond "409 Conflict" "No active batch found. Start one with /scan/multi/bw or /scan/multi/color."
+        fi
+        ;;
+
     /scan/multi/bw|/scan/multi/bw/)
         filename=$(next_multi_filename "${SW_PATTERN}-${MULTI_PATTERN}")
         if escl_scan "Grayscale8" "$ESCL_BW_DPI" "$filename"; then
@@ -143,7 +162,8 @@ case "${path%%\?*}" in
   /scan/single/bw      – scan one B&W page and process immediately
   /scan/single/color   – scan one color page and process immediately
   /scan/multi/bw       – add a B&W page to the current multi-page batch
-  /scan/multi/color    – add a color page to the current multi-page batch"
+  /scan/multi/color    – add a color page to the current multi-page batch
+  /scan/multi/next     – add a page in the same mode as the current batch"
         echo "[$(date '+%H:%M:%S')] [HTTP] 404 – unknown path: $path" >&2
         ;;
 esac

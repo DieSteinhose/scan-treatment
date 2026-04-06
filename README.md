@@ -89,6 +89,7 @@ All endpoints accept GET and POST. The container exposes them on `HTTP_PORT` (de
 | `/scan/single/color` | Scan one color page and process immediately |
 | `/scan/multi/bw` | Add a B&W page to the current multi-page batch |
 | `/scan/multi/color` | Add a color page to the current multi-page batch |
+| `/scan/multi/next` | Add a page in the same mode as the current batch (auto-detects B&W or color) |
 
 The `/scan/*` endpoints require `PRINTER_IP` to be set and eSCL to be enabled on the printer (HP EWS → Networking → eSCL (AirPrint Scan): enabled). They trigger the scan directly via the printer's eSCL API, save the resulting PDF to `WATCH_DIR`, and let the existing processing pipeline handle it — no SMB share or physical button press needed.
 
